@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Evora (patch EVORA-CIC-00) : termes sensibles cherchés dans le bundle servi (porte « termes »,
+# casse exacte, un terme par ligne). Liste PROVISOIRE de la CI de base : marques de tiers et le témoin
+# nommé par le dossier du chantier. La liste de référence est celle de l'équipe propre (dossier
+# juridique D-16, patch CIC-11) ; elle remplacera celle-ci, et la porte deviendra bloquante au commit
+# du catalogue de surcharge d'affichage (E9). Aucun terme n'est ajouté ici de mémoire.
+Adobe
+InDesign
+Primary Text Frame

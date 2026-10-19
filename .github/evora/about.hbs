@@ -1,0 +1,25 @@
+Moteur web (fork tazerty/designcraft) : licences des composants tiers (crates Rust)
+====================================================================================
+
+Liste générée par cargo-about pour la crate apps/designcraft-web et la cible wasm32-unknown-unknown
+(dépendances de build et de développement exclues). Les licences du logiciel amont lui-même, de ses
+polices et de ses ressources sont dans les autres fichiers de ce dossier.
+
+Vue d'ensemble
+--------------
+{{#each overview}}
+- {{name}} ({{id}}) : {{count}} crate(s)
+{{/each}}
+
+{{#each licenses}}
+================================================================================
+{{name}} ({{id}})
+--------------------------------------------------------------------------------
+Utilisée par :
+{{#each used_by}}
+- {{crate.name}} {{crate.version}}{{#if crate.repository}} ({{crate.repository}}){{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}

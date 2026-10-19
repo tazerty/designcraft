@@ -1,0 +1,92 @@
+# SPDX-License-Identifier: MIT
+# Evora (patch EVORA-CIC-00) : configuration de cargo-deny pour l'artefact web, c'est-à-dire le graphe
+# de la crate apps/designcraft-web pour la cible du navigateur, sans les dépendances de développement.
+# L'amont n'a pas de deny.toml au tag v0.9.0. Lancé par .github/workflows/evora-web.yml :
+#   cargo deny --manifest-path apps/designcraft-web/Cargo.toml --config .github/evora/deny.toml \
+#     --locked check advisories bans licenses sources
+# Rien n'est relâché en silence : chaque licence admise, chaque avis ignoré et chaque source git est
+# nommé avec sa raison. Relevé du 2026-10-18 sur le Cargo.lock du tag (graphe wasm32 approché par
+# Evora : 284 paquets, aucune version retirée) ; à refaire à chaque montée.
+
+[graph]
+targets = ["wasm32-unknown-unknown"]
+exclude-dev = true
+
+[advisories]
+# Base RustSec par défaut. Vulnérabilités toujours bloquantes ; avis « unmaintained » et « unsound »
+# bloquants sur tout le graphe ; une version retirée de crates.io (yanked) est refusée.
+unmaintained = "all"
+unsound = "all"
+yanked = "deny"
+ignore = [
+    # zip 3.0.0 (format natif, IDML, EPUB, PPTX, import DOCX/XLSX) : les trois avis portent sur
+    # ZipArchive::extract et ZipStreamReader::extract, qui écrivent une archive sur le système de
+    # fichiers (bits SUID/SGID, liens symboliques hors du dossier cible, permissions à travers un lien).
+    # (1) Aucun appel de ces fonctions dans l'espace de travail au tag (relevé du 2026-10-18 : les
+    # « .extract( » de crates/doc et crates/engine portent sur des récits, pas sur une archive) ;
+    # (2) la cible wasm32-unknown-unknown n'a aucun système de fichiers (std::fs y répond
+    # « unsupported »). Correctif amont : zip >= 9, montée de version à réévaluer à chaque tag.
+    { id = "RUSTSEC-2026-0367", reason = "zip 3.0.0 : extract() seulement (bits SUID/SGID) ; jamais appelé, aucun système de fichiers en wasm32 ; correctif zip >= 9 hors périmètre du fork" },
+    { id = "RUSTSEC-2026-0368", reason = "zip 3.0.0 : extract() seulement (liens hors du dossier cible) ; jamais appelé, aucun système de fichiers en wasm32 ; correctif zip >= 9 hors périmètre du fork" },
+    { id = "RUSTSEC-2026-0369", reason = "zip 3.0.0 : extract() seulement (permissions à travers un lien) ; jamais appelé, aucun système de fichiers en wasm32 ; correctif zip >= 9 hors périmètre du fork" },
+    # Avis de maintenance (pas de vulnérabilité), sans remplaçant dans le graphe de l'amont : mise
+    # en forme du texte par krilla et usvg (rustybuzz), lecture des polices (ttf-parser, par fontdb,
+    # rustybuzz et usvg). À réévaluer à chaque montée de version.
+    { id = "RUSTSEC-2026-0206", reason = "rustybuzz 0.20.1 non maintenu, sans version sûre publiée ; atteint par krilla et usvg (craft-libs, export PDF et SVG) ; avis de maintenance, à réévaluer à chaque montée" },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser 0.25.1 non maintenu, sans version sûre publiée ; atteint par fontdb, rustybuzz et usvg ; avis de maintenance, à réévaluer à chaque montée" },
+]
+
+[licenses]
+# Licences permissives seulement. Les expressions « A OR B » sont satisfaites par MIT ou Apache-2.0 ;
+# celles listées ici sont exigées par une expression « AND » ou par une licence unique :
+# BSD-2-Clause (arrayref, roots), BSD-3-Clause (alloc-no-stdlib, alloc-stdlib, brotli, tiny-skia),
+# Zlib (foldhash, slotmap, zlib-rs), Unicode-3.0 (unicode-ident, yoke, zerofrom). Une licence admise
+# mais absente du graphe réel n'est qu'un avertissement de cargo-deny.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Zlib",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.9
+exceptions = [
+    # Polices d'interface embarquées par egui (Ubuntu Light, Hack, Noto Emoji, police d'icônes) :
+    # licences de polices qui permettent l'inclusion et la redistribution avec leur texte, publié
+    # dans LICENSES/THIRD-PARTY-LICENSES.txt par cargo-about.
+    { crate = "epaint_default_fonts", allow = ["OFL-1.1", "Ubuntu-font-1.0"] },
+]
+
+[licenses.private]
+# Les crates de l'espace de travail sont « MIT OR Apache-2.0 » et sont jugées comme les autres.
+ignore = false
+
+[bans]
+# Aucune crate interdite par son nom à ce stade. Plusieurs versions d'une même crate sont signalées
+# (avertissements dans le journal du job), jamais refusées : le graphe est celui de l'amont. Les
+# dépendances « joker » sont les chemins de l'espace de travail ({ workspace = true }).
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+# crates.io et les quatre dépôts git de l'amont, chacun verrouillé à une révision dans Cargo.lock
+# (la porte « sources du verrou » de la CI exige la liste EXACTE des révisions, .github/evora/git-sources.txt) :
+#   storytold/craft-libs  : cinq révisions (craft-pdf, krilla, craft-docpath, craft-atomic, craft-cms,
+#                           craft-print, craft-ui), Apache-2.0 selon le dépôt, « MIT OR Apache-2.0 » par crate ;
+#   storytold/pdfcraft    : hayro, hayro-interpret, hayro-syntax, hayro-jbig2 (lecture des PDF) ;
+#   storytold/indd-utils  : crate indd, déclarée sur « branch = main » par l'amont, admise ici à la
+#                           seule révision du verrou (7f3060e5) ; INDD reste hors V1 (D-16, CIC-15) ;
+#   skylartaylor/winit    : correctif tiers de winit 0.30.13 ([patch.crates-io] de l'amont) ; sans
+#                           doute hors du graphe wasm (backend web d'eframe) : avertissement s'il n'est pas vu.
+# Toute autre source fait échouer la porte ; le témoin de la CI retire indd-utils et exige ce rouge.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = [
+    "https://github.com/storytold/craft-libs",
+    "https://github.com/storytold/pdfcraft",
+    "https://github.com/storytold/indd-utils",
+    "https://github.com/skylartaylor/winit",
+]
