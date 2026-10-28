@@ -33,7 +33,15 @@ juge chaque étiquette :
                    evora:ack ferment l'échange
   SHELL-REFUSED    file.revert et help.about (coquille) refusés : capability
   PARAMS-REFUSED   une commande avec un paramètre (chemin) reste sans réponse et sans effet
-  DESTRUCTIVE      une commande destructive sans confirmed : forbidden (ou n/a si le catalogue n'en a pas)
+  DESTRUCTIVE      une commande destructive sans confirmed : forbidden ; la même règle laisse passer une destructive
+                   avec confirmed: true (réponse autre que forbidden et capability)
+  DESTRUCTIVE-MARKERS
+                   règle du 2026-10-27 à 20 h 45 (avenant §5) sur le catalogue livré (commands.json) : toute commande
+                   dont l'identifiant ou le libellé porte un marqueur de retrait (REMOVAL_MARKERS) est destructive,
+                   sauf exception justifiée une par une (DESTRUCTIVE_EXCEPTIONS) ; une exception n'est jamais marquée
+                   destructive
+  DESTRUCTIVE-SET  les commandes marquées destructives au catalogue sont exactement la référence du banc
+                   (DESTRUCTIVE_EXPECTED : suppressions, coupes, effacements, réinitialisations, aplatissements)
   SOURCE-REFUSED   un message de la fenêtre témoin (même origine, autre fenêtre) est ignoré
   FILTER-NEW       Ctrl+N au clavier n'ouvre aucun dialogue de nouveau document (filtre de l'hôte)
   FOCUS-OUT        F6 : un seul evora:focus-out
@@ -45,6 +53,8 @@ juge chaque étiquette :
   WORKSPACES       les cinq espaces de travail d'Evora, dans l'ordre du travail, le premier actif (EVORA-CIC-12)
   MENUS            l'ordre des menus d'Evora ; aucun article retiré n'y reste (aide, exemple, import d'un jeu de
                    raccourcis d'un autre logiciel) (EVORA-CIC-22)
+  ICONS            les pictogrammes amont qu'Evora dessine (diag.ui) sont exactement ceux de pictogrammes.txt (audit
+                   de CIC-FK-B2 : tracés au trait du catalogue de pictogrammes d'Evora) (EVORA-CIC-22)
   KEYMAP           les raccourcis en vigueur sont exactement le jeu d'Evora : aucune touche d'un seul caractère,
                    aucune combinaison que gardent les navigateurs ou la coquille (EVORA-CIC-13)
   TOOL-KEYS        une touche d'outil d'une seule lettre ne change pas d'outil (EVORA-CIC-13)
@@ -98,8 +108,9 @@ ADMITTED = {"app.exportPdf", "app.exportInteractivePdf", "app.exportPng", "app.e
             "app.placeDialog", "app.loadSwatches"}
 LABELS = ["READY", "INIT-V2", "INIT-EXTRA", "INIT-ACK", "STARTED", "CATALOG", "NEW-DOC", "MODIFY", "SAVE-REQ",
           "S-ACK-1", "S-ACK-2", "S-ACK-3", "S-ACK-4", "S-ACK-5", "OPEN-BYTES", "EXPORT-PDF", "EXPORT-PNG", "PICK",
-          "SHELL-REFUSED", "PARAMS-REFUSED", "DESTRUCTIVE", "SOURCE-REFUSED", "FILTER-NEW", "FOCUS-OUT", "LANG",
-          "THEME", "THEME-LIGHT", "THEME-DARK", "WORKSPACES", "MENUS", "KEYMAP", "TOOL-KEYS", "TERMS", "FR-COVERAGE",
+          "SHELL-REFUSED", "PARAMS-REFUSED", "DESTRUCTIVE", "DESTRUCTIVE-MARKERS", "DESTRUCTIVE-SET", "SOURCE-REFUSED",
+          "FILTER-NEW", "FOCUS-OUT", "LANG", "THEME", "THEME-LIGHT", "THEME-DARK", "WORKSPACES", "MENUS", "ICONS", "KEYMAP",
+          "TOOL-KEYS", "TERMS", "FR-COVERAGE",
           "FONT", "FONT-INVALID", "PURGE", "NO-DOWNLOAD", "NO-EXCEPTION"]
 PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
 STORAGE_NS = "a" * 64
@@ -134,6 +145,25 @@ PIXEL_TOLERANCE = 3
 SERVED_LANGS = [("en", None), ("fr", "fr"), ("de", "de"), ("es", "es"), ("it", "it"), ("ja", "ja"), ("zh-Hans", "zh"),
                 ("ar", "ar"), ("pt", "pt-br"), ("ru", "ru")]
 TERMS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "terms.txt")
+ICONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pictogrammes.txt")
+# Commandes destructives (règle du 2026-10-27 à 20 h 45, avenant §5 du plan de la suite) : références écrites ici, jamais
+# relues du moteur qu'elles jugent. Marqueurs de retrait, préfixes de mots : anglais (identifiants), français (libellés
+# du catalogue livré, émis en français).
+REMOVAL_MARKERS = ("delete", "remove", "cut", "clear", "flatten", "reset", "discard", "erase", "reject", "purge", "strip",
+                   "wipe", "revert", "trash",
+                   "supprim", "effac", "coup", "aplat", "réinitialis", "reinitialis", "rejet", "refus", "retir", "vider",
+                   "purg", "abandon")
+# Exceptions justifiées une par une : la commande porte un marqueur sans rien retirer.
+DESTRUCTIVE_EXCEPTIONS = {
+    "view.flattenerPreview": "Affichage › Aperçu de l'aplatissement : une bascule de l'affichage, qui ne change ni le "
+                             "document ni un réglage du membre",
+}
+# Les commandes du catalogue que le pont doit marquer destructives (commands.rs, DESTRUCTIVE).
+DESTRUCTIVE_EXPECTED = {"edit.cut", "edit.clear", "transform.clear", "flex.remove", "table.deleteRow", "table.deleteColumn",
+                        "table.delete", "changes.acceptAll", "changes.rejectAll", "type.createOutlines", "table.convertToText",
+                        "variables.convertToText"}
+# Une destructive admise avec confirmed: true (sans tableau dans le document : busy, aucun effet).
+DESTRUCTIVE_CONFIRMED_PROBE = "table.delete"
 
 PARENT = """<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Evora : coquille de banc</title>
 <link rel="icon" href="data:,"></head><body style="margin:0">
@@ -211,6 +241,22 @@ SEED_STORAGE = """(async () => { localStorage.setItem('reste-autre-page', '1'); 
 def read_terms(path):
     with open(path, encoding="utf-8") as fh:
         return [l.strip() for l in fh if l.strip() and not l.lstrip().startswith("#")]
+
+
+def name_tokens(command_id):
+    """Mots d'un identifiant de commande, en minuscules (« table.deleteRow » : table, delete, row)."""
+    return [t.lower() for seg in command_id.split(".") for t in re.findall(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|\d+", seg)]
+
+
+def label_tokens(label):
+    """Mots d'un libellé, en minuscules (« Aperçu de l'aplatissement » : aperçu, de, l, aplatissement)."""
+    return re.findall(r"[^\W\d_]+", (label or "").lower())
+
+
+def removal_markers(command):
+    """Marqueurs de retrait portés par l'identifiant ou le libellé d'une commande du catalogue (préfixes de mots)."""
+    words = name_tokens(command.get("id", "")) + label_tokens(command.get("label", ""))
+    return sorted({m for m in REMOVAL_MARKERS for w in words if w.startswith(m)})
 
 
 def png_rgb_counts(data, step=2):
@@ -511,6 +557,17 @@ class Banc:
         self.set("CATALOG", bool(cmds) and not bad and len(str(cp.get("hash", ""))) == 16
                  and cp.get("params") == {"type": "object", "maxProperties": 0} and "layout.parents.new" in ids
                  and cp.get("count") == len(cmds), {"count": len(cmds), "shell": bad[:10], "lang": cp.get("lang")})
+        # Destructives prouvées sur le catalogue livré (avenant §5) : marqueurs de retrait, puis la référence du banc.
+        flagged = {x["id"] for x in cmds if x.get("destructive") is True}
+        marked = {x["id"]: removal_markers(x) for x in cmds if removal_markers(x)}
+        unflagged = sorted(i for i in marked if i not in flagged and i not in DESTRUCTIVE_EXCEPTIONS)
+        contradictory = sorted(i for i in DESTRUCTIVE_EXCEPTIONS if i in flagged)
+        self.set("DESTRUCTIVE-MARKERS", bool(cmds) and bool(marked) and not unflagged and not contradictory,
+                 {"marquees": len(marked), "nonDestructives": unflagged, "exceptionsMarqueesDestructives": contradictory,
+                  "exceptions": sorted(i for i in marked if i in DESTRUCTIVE_EXCEPTIONS)})
+        self.set("DESTRUCTIVE-SET", bool(cmds) and flagged == DESTRUCTIVE_EXPECTED,
+                 {"destructives": len(flagged), "manquantes": sorted(DESTRUCTIVE_EXPECTED - flagged),
+                  "enTrop": sorted(flagged - DESTRUCTIVE_EXPECTED)})
 
         # Modification, demande d'enregistrement, accusés (S-ACK).
         self.click_canvas()
@@ -608,11 +665,12 @@ class Banc:
             self.key("Escape", "Escape", 27)
         dm = self.answer(self.command("diag.menus"))
         destr = ((dm or {}).get("payload", {}).get("result") or {}).get("destructive", [])
-        if destr:
-            a = self.answer(self.command(destr[0]))
-            self.set("DESTRUCTIVE", bool(a and a["payload"] == {"ok": False, "code": "forbidden"}), {"command": destr[0], "ack": a and a["payload"]})
-        else:
-            self.set("DESTRUCTIVE", True, "n/a : aucune commande destructive au catalogue")
+        a = self.answer(self.command(destr[0])) if destr else None
+        c = self.answer(self.command(DESTRUCTIVE_CONFIRMED_PROBE, confirmed=True)) if DESTRUCTIVE_CONFIRMED_PROBE in destr else None
+        self.set("DESTRUCTIVE", bool(a and a["payload"] == {"ok": False, "code": "forbidden"})
+                 and bool(c) and c["payload"].get("code") not in ("forbidden", "capability"),
+                 {"command": destr[0] if destr else None, "ack": a and a["payload"], "confirmee": DESTRUCTIVE_CONFIRMED_PROBE,
+                  "ackConfirmee": c and c["payload"]})
         rsw = self.send("evora:request-save", "{reason: 'user'}", witness=True)
         self.set("SOURCE-REFUSED", self.quiet(lambda m: m.get("re") == rsw or (m.get("type") == "evora:save" and m.get("re") == rsw)))
         # La fenêtre témoin compte aussi pour la coquille (une demande ordinaire n'a pas été rejouée).
@@ -647,6 +705,9 @@ class Banc:
                  {"espaces": ui.get("workspaces"), "actif": ui.get("workspace")})
         self.set("MENUS", ui.get("menus") == EXPECTED_MENUS and ui.get("droppedItems") == 0,
                  {"menus": ui.get("menus"), "articlesRetiresRestants": ui.get("droppedItems")})
+        icons, want_icons = ui.get("icons") or [], read_terms(ICONS_FILE)
+        self.set("ICONS", bool(want_icons) and sorted(icons) == sorted(want_icons) and len(set(icons)) == len(icons),
+                 {"dessines": len(icons), "attendus": len(want_icons), "ecarts": sorted(set(icons) ^ set(want_icons))[:8]})
         sc = {k: v for k, v in (ui.get("shortcuts") or [])}
         single = sorted(k for k, v in sc.items() if single_character(v))
         reserved = sorted(k for k, v in sc.items() if v in RESERVED)

@@ -33,6 +33,9 @@
   terms-page PKG TERMS REPORT     BLOQUANTE (EVORA-CIC-11) : 0 terme dans la page servie hors .wasm (index.html,
                                  chargeur, feuilles, données).
   emojis REPO REPORT [--strict]  émojis des chaînes littérales des sources d'interface (rapport en F0).
+  icons REPO EXPECTED REPORT     BLOQUANTE (EVORA-CIC-22) : les pictogrammes d'Evora (crates/ui-egui/src/evora/icons.rs)
+                                 sont exactement ceux d'EXPECTED, chacun un nom que les dessins amont connaissent, et
+                                 icons::paint les demande à Evora avant tout dessin amont (crochet en tête).
   sizes PKG REPORT               taille du .wasm (brut, .br, .gz) et du site.
   compress PKG                   .br (brotli -q 11) et .gz (gzip -9 -n) à côté de chaque ressource web.
   csp PKG OUT                    empreintes sha256 des scripts inline d'index.html (CSP script-src).
@@ -68,6 +71,13 @@ OVERRIDE_ROW = re.compile(r'\(\s*"((?:[^"\\]|\\.)*)",\s*"([a-z-]*)",\s*"((?:[^"\
 INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.S | re.I)
 LOCK_SOURCE = re.compile(r'^source = "(git\+[^"]+)"\s*$', re.M)
 URL = re.compile(r"https?://[^\s\"]+")
+# Pictogrammes d'Evora (EVORA-CIC-22) : la table d'Evora, et le crochet en tête des dessins amont.
+ICONS_UPSTREAM = "crates/ui-egui/src/icons.rs"
+ICONS_EVORA = "crates/ui-egui/src/evora/icons.rs"
+ICONS_SIGNATURE = "pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32) {\n"
+ICONS_HOOK = "    if crate::evora::icons::paint(p, r, name, c) {\n        return;\n    }\n"
+EVORA_ICON_ROW = re.compile(r'^    \("([a-z0-9-]+)", &\[$', re.M)
+UPSTREAM_ICON_NAME = re.compile(r'"([a-z0-9-]+)"(?=\s*(?:\||=>))')
 # Fonctions de web-sys qui donnent un stockage au moteur (EVORA-CIC-04).
 STORAGE_FEATURES = ("Storage", "StorageManager", "StorageEstimate", "CacheStorage", "Cache", "IdbFactory", "IdbDatabase",
                     "IdbOpenDbRequest", "IdbTransaction", "IdbObjectStore", "FileSystemDirectoryHandle",
@@ -539,6 +549,61 @@ def cmd_emojis(repo, report_path, strict):
     return status
 
 
+def icon_findings(upstream_text, evora_text, expected):
+    """Constats de la porte des pictogrammes (liste vide : conforme)."""
+    found = []
+    if not expected:
+        found.append("liste attendue vide")
+    start = upstream_text.find(ICONS_SIGNATURE)
+    if start < 0:
+        found.append("signature de icons::paint introuvable")
+    else:
+        lines = upstream_text[start + len(ICONS_SIGNATURE):].splitlines(keepends=True)
+        k = 0
+        while k < len(lines) and lines[k].lstrip().startswith("//"):
+            k += 1
+        if "".join(lines[k:k + 3]) != ICONS_HOOK:
+            found.append("crochet d'Evora absent en tête de icons::paint")
+    names = EVORA_ICON_ROW.findall(evora_text)
+    doubles = sorted({n for n in names if names.count(n) > 1})
+    if doubles:
+        found.append("en double : " + ", ".join(doubles))
+    missing = [n for n in expected if n not in names]
+    if missing:
+        found.append("manquants dans la table d'Evora : " + ", ".join(missing))
+    extra = sorted(n for n in set(names) if n not in expected)
+    if extra:
+        found.append("hors liste : " + ", ".join(extra))
+    upstream = set(UPSTREAM_ICON_NAME.findall(strip_test_modules(upstream_text)))
+    unknown = [n for n in expected if n not in upstream]
+    if unknown:
+        found.append("inconnus des dessins amont : " + ", ".join(unknown))
+    return found
+
+
+def cmd_icons(repo, expected_path, report_path):
+    rep = Report(report_path)
+    rep.line("### Pictogrammes d'Evora (bloquante, EVORA-CIC-22)")
+    rep.line()
+    expected = read_terms(expected_path)
+    texts = []
+    for r in (ICONS_UPSTREAM, ICONS_EVORA):
+        path = os.path.join(repo, r)
+        texts.append(open(path, encoding="utf-8").read() if os.path.isfile(path) else "")
+    found = icon_findings(texts[0], texts[1], expected)
+    for f in found:
+        rep.line(f"- {f}")
+    rep.line(f"Pictogrammes attendus : {len(expected)} ; dessinés par Evora : {len(EVORA_ICON_ROW.findall(texts[1]))} ; "
+             f"constats : **{len(found)}** (attendu : 0).")
+    rep.line()
+    rep.close()
+    if found:
+        print(f"::error::porte pictogrammes : {len(found)} constat(s) : " + " ; ".join(found)[:400])
+        return 1
+    print(f"::notice::porte pictogrammes : {len(expected)} pictogrammes d'Evora, crochet en tête")
+    return 0
+
+
 def cmd_sizes(pkg, report_path):
     rep = Report(report_path)
     rep.line("### Taille (rapport ; ligne de base, aucun budget arbitré)")
@@ -712,6 +777,20 @@ def witness():
         expect("termes (page) : 1 terme planté dans le chargeur, trouvé", terms_in_page(pkg_t, pats) == [("a.js", ["Premiere"])])
         expect("stockage : persistence d'eframe plantée, trouvée",
                storage_findings(clean.replace('"wgpu"', '"wgpu", "persistence"'), clean_ws) == ["eframe:persistence (crate web)"])
+        # Pictogrammes (EVORA-CIC-22) : crochet en tête, table d'Evora égale à la liste, noms connus de l'amont.
+        up = (ICONS_SIGNATURE + "    // Evora build.\n" + ICONS_HOOK + '    match name {\n        "trash" => {}\n'
+              '        "eye" | "lock" => {}\n        _ => {}\n    }\n}\n')
+        ev = 'const ICONS: &[(&str, &[Sub])] = &[\n    ("trash", &[\n    ]),\n    ("eye", &[\n    ]),\n];\n'
+        expect("pictogrammes : matière propre, 0 constat", icon_findings(up, ev, ["trash", "eye"]) == [])
+        expect("pictogrammes : crochet neutralisé, trouvé",
+               icon_findings(up.replace("    if crate::", "    if false && crate::"), ev, ["trash", "eye"])
+               == ["crochet d'Evora absent en tête de icons::paint"])
+        expect("pictogrammes : un pictogramme retiré de la table, trouvé",
+               icon_findings(up, ev.replace('    ("eye", &[\n    ]),\n', ""), ["trash", "eye"])
+               == ["manquants dans la table d'Evora : eye"])
+        expect("pictogrammes : un nom que l'amont ne dessine pas, trouvé",
+               icon_findings(up, ev + '    ("brand-logo", &[\n', ["trash", "eye", "brand-logo"])
+               == ["inconnus des dessins amont : brand-logo"])
     ok = all(results)
     print(f"Témoins des détecteurs : {sum(results)}/{len(results)} conformes")
     return 0 if ok else 1
@@ -731,6 +810,7 @@ def main(argv):
         "terms-ui": (4, lambda a: cmd_terms_ui(a[0], a[1], a[2], a[3])),
         "terms-page": (3, lambda a: cmd_terms_page(a[0], a[1], a[2])),
         "emojis": (2, lambda a: cmd_emojis(a[0], a[1], strict)),
+        "icons": (3, lambda a: cmd_icons(a[0], a[1], a[2])),
         "sizes": (2, lambda a: cmd_sizes(a[0], a[1])),
         "compress": (1, lambda a: cmd_compress(a[0])),
         "csp": (2, lambda a: cmd_csp(a[0], a[1])),

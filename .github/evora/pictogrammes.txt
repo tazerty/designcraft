@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: MIT
+# Evora (patch EVORA-CIC-22) : noms amont que l'audit des 215 dessins de l'interface (CIC-FK-B2, 2026-10-27,
+# etat/audit-pictogrammes.tsv) remplace par un tracé au trait du catalogue d'Evora, un nom par ligne. Jugés par
+# la porte « pictogrammes » (gates.py icons) et par la fumée ICONS (diag.ui).
+tool-pencil
+tool-scissors
+rotate-clockwise
+tool-eyedropper
+tool-hand
+tool-zoom
+panel-layers
+panel-links
+panel-table
+panel-info
+panel-preflight
+panel-hyperlinks
+panel-tags
+panel-bookmarks
+panel-library
+panel-notes
+chevron-down
+chevron-right
+chevron-left
+double-chevron-left
+double-chevron-right
+first
+prev
+next
+last
+eye
+lock
+plus
+trash
+menu
+home
+search
+share
+view-options
+align-left
+align-center
+align-right
+align-justify
+swap
+none
+clock
+preset-save
+link
+link-broken
+fx
+grip
