@@ -429,10 +429,14 @@ pub(crate) fn font_definitions(craft: &'static [designcraft_fonts::CraftFont], l
     // Evora (EVORA-CIC-02): Inter, the face of Evora's interface.
     add(&mut fonts, "ui", UI_FONT);
     add(&mut fonts, "ui-semibold", include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf"));
+    // Evora (EVORA-CIC-02-b): the signs Inter lacks (the menus' small triangles…) from the previous
+    // interface face, second in every family.
+    add(&mut fonts, "ui-signs", include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf"));
     add(&mut fonts, "mono", include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf"));
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "ui".into());
+    fonts.families.entry(FontFamily::Proportional).or_default().insert(1, "ui-signs".into());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "mono".into());
-    fonts.families.insert(FontFamily::Name("semibold".into()), vec!["ui-semibold".into(), "ui".into()]);
+    fonts.families.insert(FontFamily::Name("semibold".into()), vec!["ui-semibold".into(), "ui".into(), "ui-signs".into()]);
     let pick = |script: &str| -> Vec<&designcraft_fonts::CraftFont> { craft.iter().filter(|f| f.scripts.contains(&script)).collect() };
     let mut japanese = pick("Jpan");
     // BIZ UDPGothic (the UI face) first, Regular before Bold; the semibold family prefers Bold.
@@ -465,7 +469,7 @@ pub(crate) fn font_definitions(craft: &'static [designcraft_fonts::CraftFont], l
         let stack = arabic
             .iter()
             .map(|f| name(f))
-            .chain([ui.to_string(), "ui".to_string()])
+            .chain([ui.to_string(), "ui".to_string(), "ui-signs".to_string()])
             .chain(japanese.iter().chain(&chinese).chain(&georgian).map(|f| name(f)));
         let mut seen = std::collections::HashSet::new();
         fonts.families.insert(FontFamily::Name(family.into()), stack.filter(|n| seen.insert(n.clone())).collect());
