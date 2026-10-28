@@ -7,8 +7,18 @@
   lock-sources LOCK EXPECTED REPORT
                                  BLOQUANTE : les sources git de Cargo.lock sont EXACTEMENT celles de
                                  EXPECTED (source complète, révision comprise).
-  brands PKG REPORT [--strict]   marques ArtCraft et nom amont dans le bundle (rapport en F0 ;
-                                 --strict à partir du patch E1).
+  brands PKG REPORT [--strict]   marques ArtCraft (artcraft, getartcraft, discord.gg) dans le bundle
+                                 (rapport en F0 ; --strict dès EVORA-CIC-01) ; nom amont compté en rapport.
+  brands-ui REPO PKG REPORT      BLOQUANTE (EVORA-CIC-01) : 0 « DesignCraft » dans les chaînes littérales des
+                                 couches d'affichage (L6, L7, hors tests) et dans index.html et le chargeur ;
+                                 le reste du bundle (couches moteur L1 à L5 : messages, profils, métadonnées)
+                                 est mesuré par « brands ».
+  links REPO REPORT              BLOQUANTE (EVORA-CIC-05) : aucune URL http(s) dans les chaînes littérales des
+                                 couches d'affichage, hors schéma nu (« https:// », champ de saisie vide).
+  storage-guard MANIFEST WORKSPACE REPORT
+                                 BLOQUANTE (EVORA-CIC-04) : ni fonction de stockage de web-sys (Storage,
+                                 IndexedDB, Cache Storage, gestionnaire de stockage, système de fichiers) ni
+                                 « persistence » d'eframe pour la crate web.
   terms PKG TERMS REPORT [--strict]
                                  termes sensibles de la liste TERMS dans le bundle (rapport en F0).
   emojis REPO REPORT [--strict]  émojis des chaînes littérales des sources d'interface (rapport en F0).
@@ -42,6 +52,11 @@ UI_SOURCE_DIRS = ("crates/ui-egui/src", "apps/designcraft-web/src")
 STRING_LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
 INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.S | re.I)
 LOCK_SOURCE = re.compile(r'^source = "(git\+[^"]+)"\s*$', re.M)
+URL = re.compile(r"https?://[^\s\"]+")
+# Fonctions de web-sys qui donnent un stockage au moteur (EVORA-CIC-04).
+STORAGE_FEATURES = ("Storage", "StorageManager", "StorageEstimate", "CacheStorage", "Cache", "IdbFactory", "IdbDatabase",
+                    "IdbOpenDbRequest", "IdbTransaction", "IdbObjectStore", "FileSystemDirectoryHandle",
+                    "FileSystemFileHandle", "FileSystemHandle", "FileSystemWritableFileStream", "FileSystemSyncAccessHandle")
 
 
 def is_emoji_like(cp):
@@ -216,6 +231,121 @@ def cmd_brands(pkg, report_path, strict):
     status = gate_verdict("marques", total, strict, rep)
     rep.close()
     return status
+
+
+def ui_literals(repo):
+    """(fichier, littéral) des chaînes des sources d'affichage, hors tests et commentaires de ligne."""
+    for base in UI_SOURCE_DIRS:
+        for path in walk_files(os.path.join(repo, base)):
+            name = os.path.basename(path)
+            if not name.endswith(".rs") or name.startswith("tests") or "/tests/" in path.replace(os.sep, "/"):
+                continue
+            with open(path, encoding="utf-8") as fh:
+                text = strip_test_modules(fh.read())
+            code = "\n".join(l for l in text.splitlines() if not l.lstrip().startswith("//"))
+            for lit in STRING_LITERAL.findall(code):
+                yield rel(path, repo), lit
+
+
+def cmd_brands_ui(repo, pkg, report_path):
+    rep = Report(report_path)
+    rep.line("### Nom amont dans les couches d'affichage (bloquante, EVORA-CIC-01)")
+    rep.line()
+    hits = {}
+    for r, lit in ui_literals(repo):
+        n = lit.count(UPSTREAM_NAME)
+        if n:
+            hits[r] = hits.get(r, 0) + n
+    served = {}
+    for path, r in bundle_files(pkg):
+        if r.endswith((".html", ".js")):
+            with open(path, "rb") as fh:
+                n = fh.read().count(UPSTREAM_NAME.encode())
+            if n:
+                served[r] = n
+    for r, n in sorted(hits.items()):
+        rep.line(f"- source `{r}` : {n}")
+    for r, n in sorted(served.items()):
+        rep.line(f"- servi `{r}` : {n}")
+    total = sum(hits.values()) + sum(served.values())
+    rep.line()
+    rep.line(f"`{UPSTREAM_NAME}` dans les chaînes d'affichage, index.html et le chargeur : **{total}** (attendu : 0).")
+    rep.line()
+    rep.close()
+    if total:
+        print(f"::error::porte nom amont (affichage) : {total} occurrence(s)")
+        return 1
+    print("::notice::porte nom amont (affichage) : 0 occurrence")
+    return 0
+
+
+def outside_links(repo):
+    found = []
+    for r, lit in ui_literals(repo):
+        for url in URL.findall(lit):
+            if url not in ("http://", "https://"):
+                found.append((r, url[:80]))
+    return found
+
+
+def cmd_links(repo, report_path):
+    rep = Report(report_path)
+    rep.line("### Liens sortants des couches d'affichage (bloquante, EVORA-CIC-05)")
+    rep.line()
+    found = outside_links(repo)
+    for r, url in found:
+        rep.line(f"- `{r}` : `{url}`")
+    rep.line(f"URL dans les chaînes d'affichage (hors schéma nu) : **{len(found)}** (attendu : 0).")
+    rep.line()
+    rep.close()
+    if found:
+        print(f"::error::porte liens sortants : {len(found)} URL")
+        return 1
+    print("::notice::porte liens sortants : 0 URL")
+    return 0
+
+
+def toml_list(text, key):
+    """Les chaînes de la liste `key = [ … ]` d'une ligne de dépendance TOML (approché, suffisant ici)."""
+    out = []
+    for m in re.finditer(r"%s\s*=\s*\[([^\]]*)\]" % re.escape(key), text):
+        out += re.findall(r'"([^"]+)"', m.group(1))
+    return out
+
+
+def storage_findings(manifest_text, workspace_text):
+    found = []
+    for line in manifest_text.splitlines():
+        if line.lstrip().startswith("web-sys"):
+            found += [f"web-sys:{f}" for f in toml_list(line, "features") if f in STORAGE_FEATURES]
+        if line.lstrip().startswith("eframe") and "persistence" in toml_list(line, "features"):
+            found.append("eframe:persistence (crate web)")
+    for line in workspace_text.splitlines():
+        if line.lstrip().startswith("eframe") and "persistence" in toml_list(line, "features"):
+            found.append("eframe:persistence (espace de travail)")
+    return found
+
+
+def cmd_storage_guard(manifest, workspace, report_path):
+    with open(manifest, encoding="utf-8") as fh:
+        mt = fh.read()
+    with open(workspace, encoding="utf-8") as fh:
+        wt = fh.read()
+    found = storage_findings(mt, wt)
+    rep = Report(report_path)
+    rep.line("### Absence de stockage du moteur (bloquante, EVORA-CIC-04)")
+    rep.line()
+    rep.line(f"Fonctions de stockage de la crate web : **{len(found)}** (attendu : 0) ; " + (", ".join(found) or "aucune") + ".")
+    rep.line()
+    rep.close()
+    if "web-sys" not in mt:
+        print("::error::porte stockage : aucune ligne web-sys dans le manifeste, rien à juger")
+        return 1
+    if found:
+        print("::error::porte stockage : " + ", ".join(found))
+        return 1
+    print("::notice::porte stockage : aucune fonction de stockage")
+    return 0
 
 
 def read_terms(path):
@@ -415,6 +545,23 @@ def witness():
         expect("émojis : 1 compté (littéral), commentaire, module de test et fichier de test ignorés",
                emoji_in_sources(repo) == {f"{UI_SOURCE_DIRS[0]}/a.rs": 1})
         expect("émojis --strict : porte rouge", cmd_emojis(repo, None, True) == 1)
+
+        write(os.path.join(repo, UI_SOURCE_DIRS[0], "b.rs"),
+              'fn f() -> &str { "Quit DesignCraft" }\nfn g() -> &str { "https://example.org/x" }\n'
+              'fn h() -> &str { "https://" }\n// "https://commentaire.example"\n')
+        expect("nom amont : 1 « DesignCraft » littéral trouvé", cmd_brands_ui(repo, pkg, None) == 1)
+        expect("liens : 1 URL trouvée, schéma nu et commentaire ignorés",
+               outside_links(repo) == [(f"{UI_SOURCE_DIRS[0]}/b.rs", "https://example.org/x")])
+        write(os.path.join(repo, UI_SOURCE_DIRS[0], "b.rs"), 'fn h() -> &str { "https://" }\n')
+        expect("liens : matière propre, porte verte", cmd_links(repo, None) == 0)
+        clean_ws = 'eframe = { version = "0.36", default-features = false }\n'
+        clean = 'web-sys = { version = "0.3", features = ["Window", "MessageEvent"] }\neframe = { workspace = true, features = ["wgpu"] }\n'
+        expect("stockage : manifeste propre, 0 trouvé", storage_findings(clean, clean_ws) == [])
+        dirty = clean.replace('"MessageEvent"', '"MessageEvent", "Storage", "IdbFactory"')
+        expect("stockage : Storage et IdbFactory plantés, 2 trouvés",
+               storage_findings(dirty, clean_ws) == ["web-sys:Storage", "web-sys:IdbFactory"])
+        expect("stockage : persistence d'eframe plantée, trouvée",
+               storage_findings(clean.replace('"wgpu"', '"wgpu", "persistence"'), clean_ws) == ["eframe:persistence (crate web)"])
     ok = all(results)
     print(f"Témoins des détecteurs : {sum(results)}/{len(results)} conformes")
     return 0 if ok else 1
@@ -427,6 +574,9 @@ def main(argv):
         "hosting": (2, lambda a: cmd_hosting(a[0], a[1])),
         "lock-sources": (3, lambda a: cmd_lock_sources(a[0], a[1], a[2])),
         "brands": (2, lambda a: cmd_brands(a[0], a[1], strict)),
+        "brands-ui": (3, lambda a: cmd_brands_ui(a[0], a[1], a[2])),
+        "links": (2, lambda a: cmd_links(a[0], a[1])),
+        "storage-guard": (3, lambda a: cmd_storage_guard(a[0], a[1], a[2])),
         "terms": (3, lambda a: cmd_terms(a[0], a[1], a[2], strict)),
         "emojis": (2, lambda a: cmd_emojis(a[0], a[1], strict)),
         "sizes": (2, lambda a: cmd_sizes(a[0], a[1])),
