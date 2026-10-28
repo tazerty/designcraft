@@ -24,7 +24,8 @@ use designcraft_ui_egui::menus::{self, Item};
 use serde_json::{Value, json};
 
 /// The shell's namespace, refused by construction (rule of 2026-10-27).
-const SHELL_PREFIXES: [&str; 5] = ["file.", "app.", "help.", "prefs.", "window."];
+// SABORDAGE QA (témoin groupé CIC-FK-B1) : « file. » admis, doit rougir CATALOG et SHELL-REFUSED.
+const SHELL_PREFIXES: [&str; 4] = ["app.", "help.", "prefs.", "window."];
 /// Exports and imports that pass through the host, admitted one by one: every file they write leaves
 /// as `evora:export`, every file they read comes from `evora:pick`.
 pub const ADMITTED: [&str; 12] = [

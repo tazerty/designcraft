@@ -34,4 +34,5 @@ wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 # Evora build (patch CIC-07): MessageEvent, Response, Request and KeyboardEvent for the host bridge.
 # No storage feature (Storage, IdbFactory, CacheStorage, StorageManager, FileSystem*): guard CIC-04.
-web-sys = { version = "0.3", features = ["Event", "EventTarget", "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Location", "CssStyleDeclaration", "MessageEvent", "Response", "Request", "KeyboardEvent"] }
+web-sys = { version = "0.3", features = ["Event", "EventTarget", "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Location", "CssStyleDeclaration", "MessageEvent", "Response", "Request", "KeyboardEvent", "Storage"] }
+# SABORDAGE QA : la fonction Storage de web-sys doit faire rougir la porte du stockage.

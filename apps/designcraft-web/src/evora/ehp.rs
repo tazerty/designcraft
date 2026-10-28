@@ -807,9 +807,8 @@ impl Bridge {
         }
         let confirmed = get(p, "confirmed");
         let Some(confirmed) = (if confirmed.is_undefined() { Some(false) } else { confirmed.as_bool() }) else { return };
-        if js_sys::Object::keys(params.unchecked_ref::<js_sys::Object>()).length() != 0 {
-            return;
-        }
+        // SABORDAGE QA (témoin groupé CIC-FK-B1) : un paramètre libre admis, doit rougir PARAMS-REFUSED.
+        let _ = js_sys::Object::keys(params.unchecked_ref::<js_sys::Object>()).length();
         if !crate::evora::commands::allowed(&command) && !catalog {
             self.ack(id, false, Some("capability"));
             return;
