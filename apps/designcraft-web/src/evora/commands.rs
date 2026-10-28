@@ -11,10 +11,14 @@
 //! - `params` must be `{}` (no item of the catalogue declares a parameter schema): checked by the
 //!   bridge before anything runs; a command runs as its menu item runs (`menus::activate` with no
 //!   parameter), its dialog opening in the engine;
-//! - a command that loses work beyond Edit › Undo (revert to the saved state, close) is destructive
-//!   ([`DESTRUCTIVE`]): refused without `confirmed: true` (`forbidden`). The engine's `noundo`
-//!   commands are NOT destructive by that alone: most of them change no document (selection, copy,
-//!   navigation, Undo and Redo themselves).
+//! - a command that takes content or a setting of the member out (deletions, cuts, clears,
+//!   flattenings, resets), or whose effect Edit › Undo does not take back, is destructive
+//!   ([`DESTRUCTIVE`], rule of 2026-10-27 at 20 h 45 for every command bridge of the suite): refused
+//!   without `confirmed: true` (`forbidden`). The smoke test proves the list on the catalogue the build
+//!   delivers (`commands.json`): every command whose id or label carries a removal marker is
+//!   destructive, save an exception it justifies one by one. The engine's `noundo` commands are NOT
+//!   destructive by that alone: most of them change no document (selection, copy, navigation, Undo
+//!   and Redo themselves).
 //!
 //! The compiled list (capability `command` alone) keeps the exports through the host and the
 //! diagnostics the smoke test reads.
@@ -69,12 +73,39 @@ pub fn admitted_name(id: &str) -> bool {
     ADMITTED.contains(&id) || !SHELL_PREFIXES.iter().any(|p| id.starts_with(p))
 }
 
-/// Commands that lose work beyond Edit › Undo. At v0.13.0 none of them is in the catalogue (the
-/// shell's namespace is refused); the list stands for an admission or an upstream version that would
-/// bring one in, and the bridge refuses it without `confirmed: true`.
-pub const DESTRUCTIVE: [&str; 5] = ["file.revert", "file.close", "file.closeAll", "file.closeOthers", "file.closeAllOthers"];
+/// Commands that take content or a setting of the member out, or whose effect Edit › Undo does not
+/// take back: the bridge refuses them without `confirmed: true`.
+pub const DESTRUCTIVE: &[&str] = &[
+    // The shell's namespace, refused by construction: kept for an admission or an upstream version
+    // that would bring one in (revert to the saved state, close).
+    "file.revert",
+    "file.close",
+    "file.closeAll",
+    "file.closeOthers",
+    "file.closeAllOthers",
+    // Cut and Clear: the selection leaves the document.
+    "edit.cut",
+    "edit.clear",
+    // Clear Transformations: the member's rotation, scale and shear are reset.
+    "transform.clear",
+    // Removing a flex layout: the member's flex layout is taken out.
+    "flex.remove",
+    // Table deletions: a row, a column, the whole table.
+    "table.deleteRow",
+    "table.deleteColumn",
+    "table.delete",
+    // Tracked changes: accepting all makes every tracked deletion final and drops the review;
+    // rejecting all takes every tracked insertion out.
+    "changes.acceptAll",
+    "changes.rejectAll",
+    // Flattenings: the text becomes paths (its words are gone), the table becomes text (its cells,
+    // rows and styles are gone), the variable becomes fixed text.
+    "type.createOutlines",
+    "table.convertToText",
+    "variables.convertToText",
+];
 
-/// A command that loses work beyond Edit › Undo.
+/// A command of [`DESTRUCTIVE`]: refused without `confirmed: true`.
 pub fn destructive(id: &str) -> bool {
     DESTRUCTIVE.contains(&id)
 }
