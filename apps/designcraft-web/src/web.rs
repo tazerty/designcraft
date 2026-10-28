@@ -489,7 +489,13 @@ fn host_services(inbox: Inbox, bridge: Bridge, host_call: HostCall) -> Services 
         open_async: Some(Box::new(move |request: ImportRequest| crate::evora::pick::open(&pick_bridge, &pick_inbox, request))),
         pick_save: Some(Box::new(|name: &str| Some(name.to_string()))),
         write: Some(Box::new(move |name: &str, bytes: &[u8]| export_bridge.export(&file_name(name), bytes).map_err(|code| format!("Evora: {code}")))),
-        download: Some(Box::new(move |name: &str, bytes: &[u8]| bridge.save(&file_name(name), bytes).map_err(|code| format!("Evora: {code}")))),
+        download: Some(Box::new(move |name: &str, bytes: &[u8]| {
+            // SABORDAGE QA (témoin 2 de CIC-FK-B1) : un téléchargement du navigateur, doit rougir NO-DOWNLOAD seul.
+            HOST_MODE.with(|m| m.set(false));
+            let _ = download(&file_name(name), bytes);
+            HOST_MODE.with(|m| m.set(true));
+            bridge.save(&file_name(name), bytes).map_err(|code| format!("Evora: {code}"))
+        })),
         inbox: Some(inbox),
         host_filter: Some(crate::evora::masks::filter(host_call)),
         ..Default::default()
