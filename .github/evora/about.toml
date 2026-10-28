@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Evora (patch EVORA-CIC-00) : configuration de cargo-about. Génère LICENSES/THIRD-PARTY-LICENSES.txt de
+# l'artefact web (licences des crates Rust compilées dans le .wasm), avec .github/evora/about.hbs.
+# Mêmes licences admises que .github/evora/deny.toml ; l'ordre est la priorité de choix quand une crate
+# offre une alternative (« MIT OR Apache-2.0 » donne MIT).
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Zlib",
+    "Unicode-3.0",
+]
+targets = ["wasm32-unknown-unknown"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true
+
+# Polices d'interface embarquées par egui : licences de polices (même exception que deny.toml).
+[epaint_default_fonts]
+accepted = ["OFL-1.1", "Ubuntu-font-1.0"]
