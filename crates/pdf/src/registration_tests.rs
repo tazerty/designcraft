@@ -218,7 +218,7 @@ fn check_registered(bytes: &[u8], hidden: bool) {
     for object in pdf.objects() {
         let Object::Dict(dict) = object else { continue };
         if dict.get::<Name<'_>>(b"Type").as_ref().map(AsRef::as_ref) == Some(b"OCG") {
-            assert!(!dict.contains_key(b"DesignCraftHiddenOCG"), "internal marker remains in resolved OCG {:?}", dict.obj_id());
+            assert!(!dict.contains_key(b"CiceroHiddenOCG"), "internal marker remains in resolved OCG {:?}", dict.obj_id());
         }
     }
 }

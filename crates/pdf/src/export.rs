@@ -170,8 +170,8 @@ fn export_pdf_with_report_inner(doc: &Document, cache: &Cache, opts: &PdfOptions
     let title = opts.title.clone().unwrap_or_else(|| doc.title.clone());
     let created = opts.created.or_else(now_unix);
     let metadata = Metadata {
-        creator: "DesignCraft".into(),
-        producer: "DesignCraft".into(),
+        creator: "Evora Cicero".into(),
+        producer: "Evora Cicero".into(),
         title: Some(title.clone()),
         authors: opts.author.iter().cloned().collect(),
         created: created.map(date_time),
@@ -291,7 +291,8 @@ pub fn merge_pdfs(parts: &[(Vec<u8>, Vec<(f32, f32)>)], title: Option<&str>) -> 
 }
 
 fn merge_pdfs_inner(parts: &[(Vec<u8>, Vec<(f32, f32)>)], title: Option<&str>) -> Result<Vec<u8>> {
-    let metadata = Metadata { creator: "DesignCraft".into(), producer: "DesignCraft".into(), title: title.map(str::to_owned), ..Default::default() };
+    let metadata =
+        Metadata { creator: "Evora Cicero".into(), producer: "Evora Cicero".into(), title: title.map(str::to_owned), ..Default::default() };
     let mut writer = Writer::new(krilla::SerializeSettings::default(), metadata);
     let pdf = writer.document_mut();
     let mut pages = 0;
@@ -363,7 +364,7 @@ fn export_booklet_inner(doc: &Document, cache: &Cache, opts: &BookletOptions) ->
     let pdf_opts = PdfOptions { title: opts.title.clone(), ..PdfOptions::default() };
     let settings = krilla::SerializeSettings { compress_content_streams: true, ..Default::default() };
     let title = opts.title.clone().unwrap_or_else(|| doc.title.clone());
-    let metadata = Metadata { creator: "DesignCraft".into(), producer: "DesignCraft".into(), title: Some(title), ..Default::default() };
+    let metadata = Metadata { creator: "Evora Cicero".into(), producer: "Evora Cicero".into(), title: Some(title), ..Default::default() };
     let mut writer = Writer::new(settings, metadata);
     let pdf = writer.document_mut();
     let mut ex = Exporter {

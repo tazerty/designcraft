@@ -60,7 +60,7 @@ fn build_generic_cmyk() -> Result<Profile, CmsError> {
     let mut p = Builtin::CoatedCmyk.profile().clone();
     p.rendering_intent = CmsIntent::RelativeColorimetric;
     p.description = super::GENERIC_CMYK.into();
-    p.copyright = "No copyright; made by DesignCraft from its parametric press model. Use freely.".into();
+    p.copyright = "No copyright; made by Evora Cicero from its parametric press model. Use freely.".into();
     p.white_point = [0.9642, 1.0, 0.8249];
     p.black_point = None;
     p.chad = None;
