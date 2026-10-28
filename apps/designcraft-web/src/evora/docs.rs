@@ -165,6 +165,8 @@ impl HostDocs {
                 self.bridge.ack_result(id, &stats);
             }
             "diag.menus" => self.bridge.ack_result(id, &crate::evora::commands::diag_menus(app)),
+            "diag.ui" => self.bridge.ack_result(id, &crate::evora::commands::diag_ui(app)),
+            "diag.labels" => self.bridge.ack_result(id, &crate::evora::commands::diag_labels(app)),
             _ => match crate::evora::commands::run(app, command, confirmed, self.bridge.has("command.catalog")) {
                 Ok(()) => self.bridge.ack(id, true, None),
                 Err(code) => self.bridge.ack(id, false, Some(code)),

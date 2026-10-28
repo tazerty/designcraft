@@ -44,8 +44,10 @@ pub const ADMITTED: [&str; 12] = [
 /// The compiled list: exports through the host that write at once (no dialog), and the picker.
 const ENGINE_COMMANDS: [&str; 3] = ["app.exportInteractivePdf", "app.exportPng", "app.placeDialog"];
 /// Diagnostics answered by the bridge (smoke): what the engine holds (`diag.stats`), the catalogue,
-/// the items the rule refuses, the masked and the destructive ones (`diag.menus`).
-const DIAGNOSTICS: [&str; 2] = ["diag.stats", "diag.menus"];
+/// the items the rule refuses, the masked and the destructive ones (`diag.menus`); the interface Evora
+/// designed (`diag.ui`: theme, workspaces, menus, shortcuts, tool) and the strings the tables show in the
+/// current language (`diag.labels`), EVORA-CIC-02, 11, 12, 13, 19 and 22.
+const DIAGNOSTICS: [&str; 4] = ["diag.stats", "diag.menus", "diag.ui", "diag.labels"];
 
 /// FNV-1a 64 (offset basis and prime): the catalogue's fingerprint, an identity of the build's
 /// commands, not a secret.
@@ -218,4 +220,66 @@ pub fn stats(app: &DesignApp, doc_ref: Option<&str>, uid: Option<u64>, counters:
 fn wasm_memory_bytes() -> f64 {
     let read = |v: &wasm_bindgen::JsValue, key: &str| js_sys::Reflect::get(v, &wasm_bindgen::JsValue::from_str(key)).unwrap_or(wasm_bindgen::JsValue::UNDEFINED);
     read(&read(&wasm_bindgen::memory(), "buffer"), "byteLength").as_f64().unwrap_or(0.0)
+}
+
+/// `diag.ui` (EVORA-CIC-02, CIC-12, CIC-13, CIC-22): the interface Evora designed, as the engine holds
+/// it: brightness and theme tokens, workspaces, the menus in order (and the dropped items left), the
+/// shortcuts in effect, the current tool.
+pub fn diag_ui(app: &DesignApp) -> Value {
+    use designcraft_ui_egui::theme::{Brightness, Tokens};
+    let t = Tokens::for_brightness(app.ui.brightness);
+    let hex = |c: egui::Color32| format!("#{:02x}{:02x}{:02x}", c.r(), c.g(), c.b());
+    let tree = menus::menu_tree();
+    let dropped: usize = tree.iter().map(|(_, entries)| count_dropped(entries)).sum();
+    json!({
+        "brightness": app.ui.brightness.id(),
+        "levels": Brightness::ALL.iter().map(|b| b.id()).collect::<Vec<_>>(),
+        "tokens": {
+            "appBar": hex(t.app_bar),
+            "panel": hex(t.panel),
+            "panelDarker": hex(t.panel_darker),
+            "pasteboard": hex(t.pasteboard),
+            "text": hex(t.text),
+            "accent": hex(t.accent),
+            "accentStrong": hex(t.accent_strong),
+            "rowSelected": hex(t.row_selected),
+            "radius": t.radius,
+        },
+        "workspace": app.ui.workspace,
+        "workspaces": menus::WORKSPACES,
+        "menus": tree.iter().map(|(menu, _)| *menu).collect::<Vec<_>>(),
+        "droppedItems": dropped,
+        "shortcuts": menus::effective_shortcuts(app),
+        "tool": app.session.tool_id(),
+    })
+}
+
+/// Items of `items` (submenus included) the Evora build drops (`evora::menus::dropped`): 0 expected.
+fn count_dropped(items: &[Item]) -> usize {
+    items
+        .iter()
+        .map(|it| match it {
+            Item::Sub(_, children) => count_dropped(children),
+            Item::Cmd { id, .. } if designcraft_ui_egui::evora::menus::dropped(id.as_str()) => 1,
+            _ => 0,
+        })
+        .sum()
+}
+
+/// `diag.labels` (EVORA-CIC-11, CIC-19): every string the tables show in the current language, the
+/// count of those translated, and Evora's own strings of this language left untranslated.
+pub fn diag_labels(app: &DesignApp) -> Value {
+    let lang = app.ui.language.clone();
+    let served = designcraft_ui_egui::i18n::evora_served(&lang);
+    let translated = served.iter().filter(|pair| pair.0 != pair.1).count();
+    let own = designcraft_ui_egui::i18n::evora_own_keys(&lang);
+    let missing: Vec<&str> = own.iter().copied().filter(|k| designcraft_ui_egui::i18n::tr(&lang, k) == *k).collect();
+    json!({
+        "lang": if lang.is_empty() { "en".to_string() } else { lang.clone() },
+        "count": served.len(),
+        "translated": translated,
+        "own": own.len(),
+        "missingOwn": missing,
+        "labels": served.iter().map(|pair| pair.1).collect::<Vec<&str>>(),
+    })
 }
