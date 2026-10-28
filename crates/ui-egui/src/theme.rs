@@ -1,4 +1,5 @@
-//! Design tokens (InDesign's four interface brightness levels), fonts and egui style.
+//! Design tokens (Evora's three interface brightness levels: light, dark and high contrast; patch
+//! EVORA-CIC-02 of `apps/cicero/UPSTREAM.md` in Evora), fonts (Inter) and egui style.
 
 use std::sync::Arc;
 
@@ -8,21 +9,24 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Brightness {
     Dark,
-    #[default]
+    /// Evora build: read as `Dark` (an intermediate level of the upstream build, kept for old settings).
     MediumDark,
+    /// Evora build: read as `Light` (idem).
     MediumLight,
+    #[default]
     Light,
     /// Accessibility: black chrome, white text, yellow selection and focus.
     HighContrast,
 }
 
 impl Brightness {
-    pub const ALL: [Brightness; 5] = [Brightness::Dark, Brightness::MediumDark, Brightness::MediumLight, Brightness::Light, Brightness::HighContrast];
+    /// Evora's three levels (EVORA-CIC-02), in the menu's order.
+    pub const ALL: [Brightness; 3] = [Brightness::Light, Brightness::Dark, Brightness::HighContrast];
     pub fn label(self) -> &'static str {
         match self {
             Brightness::Dark => "Dark",
-            Brightness::MediumDark => "Medium Dark",
-            Brightness::MediumLight => "Medium Light",
+            Brightness::MediumDark => "Dark",
+            Brightness::MediumLight => "Light",
             Brightness::Light => "Light",
             Brightness::HighContrast => "High Contrast",
         }
@@ -37,6 +41,13 @@ impl Brightness {
         }
     }
     pub fn parse(s: &str) -> Option<Self> {
+        // Evora build: the upstream build's intermediate levels are read as Evora's dark and light.
+        if s.eq_ignore_ascii_case("mediumDark") {
+            return Some(Brightness::Dark);
+        }
+        if s.eq_ignore_ascii_case("mediumLight") {
+            return Some(Brightness::Light);
+        }
         Self::ALL.into_iter().find(|b| b.id().eq_ignore_ascii_case(s) || b.label().eq_ignore_ascii_case(s))
     }
 }
@@ -95,167 +106,127 @@ fn hex(s: u32) -> Color32 {
 }
 
 impl Tokens {
+    /// Evora's tokens (EVORA-CIC-02): the zinc neutrals and the indigo accent of Evora's design system
+    /// (`apps/cicero/CONCEPTION-PRO.md` §7.6 in Evora), in three brightness levels. No value of the
+    /// upstream build is kept; its two intermediate levels read as dark and light.
     pub fn for_brightness(b: Brightness) -> Self {
+        let light = Tokens {
+            dark: false,
+            app_bar: hex(0xffffff),
+            panel: hex(0xfafafa),
+            panel_darker: hex(0xf4f4f5),
+            input: hex(0xffffff),
+            input_border: hex(0x8a8a93),
+            divider: hex(0xe4e4e7),
+            text: hex(0x27272a),
+            text_strong: hex(0x18181b),
+            text_dim: hex(0x63636b),
+            text_disabled: hex(0xa1a1aa),
+            icon: hex(0x3f3f46),
+            hover: hex(0xf4f4f5),
+            tool_active: hex(0xeef2ff),
+            accent: hex(0x4f46e5),
+            accent_strong: hex(0x4f46e5),
+            row_selected: hex(0xe0e7ff),
+            pasteboard: hex(0xe4e4e7),
+            ruler: hex(0xffffff),
+            ruler_tick: hex(0x71717a),
+            tab_inactive: hex(0xf4f4f5),
+            button: hex(0xffffff),
+            radius: 4,
+            border: hex(0xe4e4e7),
+            field_border: hex(0x8a8a93),
+            well: hex(0xeef2ff),
+            well_rim: hex(0xc7d2fe),
+            ruler_text: hex(0x3f3f46),
+            section_divider: hex(0xe4e4e7),
+            tab_strip: hex(0xf4f4f5),
+            smart_guide: hex(0x10b981),
+            measure_bg: Color32::from_rgba_unmultiplied(24, 24, 27, 230),
+            measure_text: Color32::WHITE,
+            live_corner: hex(0xf59e0b),
+            caption_close: hex(0xdc2626),
+            caption_close_text: Color32::WHITE,
+        };
         let dark = Tokens {
             dark: true,
-            app_bar: hex(0x262626),
-            panel: hex(0x323232),
-            panel_darker: hex(0x282828),
-            input: hex(0x1f1f1f),
-            input_border: hex(0x4a4a4a),
-            divider: hex(0x1e1e1e),
-            text: hex(0xd8d8d8),
-            text_strong: hex(0xf2f2f2),
-            text_dim: hex(0xa3a3a3),
-            text_disabled: hex(0x6a6a6a),
-            icon: hex(0xc8c8c8),
-            hover: hex(0x424242),
-            tool_active: hex(0x1b1b1b),
-            accent: hex(0x378ef0),
-            accent_strong: hex(0x1473e6),
-            row_selected: hex(0x2d4f7c),
-            pasteboard: hex(0x232323),
-            ruler: hex(0x2e2e2e),
-            ruler_tick: hex(0x9a9a9a),
-            tab_inactive: hex(0x262626),
-            button: hex(0x404040),
-            radius: 1,
-            border: hex(0x1e1e1e),
-            field_border: hex(0x5a5a5a),
-            well: hex(0x1b1b1b),
-            well_rim: hex(0x3a3a3a),
-            ruler_text: hex(0xd8d8d8),
-            section_divider: hex(0x282828),
-            tab_strip: hex(0x282828),
-            smart_guide: hex(0x00c853),
-            measure_bg: Color32::from_rgba_unmultiplied(70, 70, 70, 230),
+            app_bar: hex(0x18181b),
+            panel: hex(0x18181b),
+            panel_darker: hex(0x09090b),
+            input: hex(0x09090b),
+            input_border: hex(0x71717a),
+            divider: hex(0x27272a),
+            text: hex(0xe4e4e7),
+            text_strong: hex(0xfafafa),
+            text_dim: hex(0xa1a1aa),
+            text_disabled: hex(0x52525b),
+            icon: hex(0xd4d4d8),
+            hover: hex(0x27272a),
+            tool_active: hex(0x1e1b3a),
+            accent: hex(0x818cf8),
+            accent_strong: hex(0x4f46e5),
+            row_selected: hex(0x1e1b4b),
+            pasteboard: hex(0x0c0c0e),
+            ruler: hex(0x18181b),
+            ruler_tick: hex(0x71717a),
+            tab_inactive: hex(0x18181b),
+            button: hex(0x27272a),
+            radius: 4,
+            border: hex(0x27272a),
+            field_border: hex(0x71717a),
+            well: hex(0x1e1b4b),
+            well_rim: hex(0x3730a3),
+            ruler_text: hex(0xd4d4d8),
+            section_divider: hex(0x27272a),
+            tab_strip: hex(0x09090b),
+            smart_guide: hex(0x34d399),
+            measure_bg: Color32::from_rgba_unmultiplied(39, 39, 42, 235),
             measure_text: Color32::WHITE,
-            live_corner: hex(0xffe500),
-            caption_close: hex(0xc42b1c),
+            live_corner: hex(0xfbbf24),
+            caption_close: hex(0xdc2626),
             caption_close_text: Color32::WHITE,
         };
         match b {
-            Brightness::Dark => dark,
-            // Measured from InDesign 2026 (plan/indesign/11-observed-ui.md §1).
-            Brightness::MediumDark => Tokens {
-                app_bar: hex(0x535353),
-                panel: hex(0x535353),
-                panel_darker: hex(0x424242),
-                input: hex(0x454545),
-                input_border: hex(0x747474),
-                divider: hex(0x4b4b4b),
-                text: hex(0xffffff),
-                text_strong: hex(0xffffff),
-                text_dim: hex(0xb0b0b0),
-                text_disabled: hex(0x8a8a8a),
-                icon: hex(0xc2c2c2),
-                hover: hex(0x606060),
-                tool_active: hex(0x303030),
-                row_selected: hex(0x4a6a92),
-                pasteboard: hex(0x5e5e5e),
-                ruler: hex(0x1f1f1f),
-                ruler_tick: hex(0x858585),
-                tab_inactive: hex(0x424242),
-                button: hex(0x535353),
-                border: hex(0x383838),
-                field_border: hex(0x747474),
-                well: hex(0x303030),
-                well_rim: hex(0x565656),
-                ruler_text: hex(0xffffff),
-                section_divider: hex(0x4b4b4b),
-                tab_strip: hex(0x424242),
-                ..dark
-            },
-            Brightness::MediumLight => Tokens {
-                dark: false,
-                app_bar: hex(0xa8a8a8),
-                panel: hex(0xb8b8b8),
-                panel_darker: hex(0xaaaaaa),
-                input: hex(0xd6d6d6),
-                input_border: hex(0x8c8c8c),
-                divider: hex(0x9c9c9c),
-                text: hex(0x1e1e1e),
-                text_strong: hex(0x000000),
-                text_dim: hex(0x3c3c3c),
-                text_disabled: hex(0x7a7a7a),
-                icon: hex(0x2a2a2a),
-                hover: hex(0xc8c8c8),
-                tool_active: hex(0x9a9a9a),
-                row_selected: hex(0x8eb2e0),
-                pasteboard: hex(0xa0a0a0),
-                ruler: hex(0xc0c0c0),
-                ruler_tick: hex(0x3a3a3a),
-                tab_inactive: hex(0xa6a6a6),
-                button: hex(0xb8b8b8),
-                border: hex(0x8c8c8c),
-                field_border: hex(0x7a7a7a),
-                well: hex(0x9a9a9a),
-                well_rim: hex(0x8a8a8a),
-                ruler_text: hex(0x1e1e1e),
-                section_divider: hex(0x9c9c9c),
-                tab_strip: hex(0xa6a6a6),
-                ..dark
-            },
-            Brightness::Light => Tokens {
-                dark: false,
-                app_bar: hex(0xe4e4e4),
-                panel: hex(0xf0f0f0),
-                panel_darker: hex(0xe2e2e2),
-                input: hex(0xffffff),
-                input_border: hex(0xb4b4b4),
-                divider: hex(0xd0d0d0),
-                text: hex(0x1e1e1e),
-                text_strong: hex(0x000000),
-                text_dim: hex(0x555555),
-                text_disabled: hex(0x9a9a9a),
-                icon: hex(0x2c2c2c),
-                hover: hex(0xdddddd),
-                tool_active: hex(0xcfcfcf),
-                row_selected: hex(0xc4dbf7),
-                pasteboard: hex(0xd4d4d4),
-                ruler: hex(0xf2f2f2),
-                ruler_tick: hex(0x4a4a4a),
-                tab_inactive: hex(0xdcdcdc),
-                button: hex(0xf0f0f0),
-                border: hex(0xc4c4c4),
-                field_border: hex(0xa8a8a8),
-                well: hex(0xcfcfcf),
-                well_rim: hex(0xbdbdbd),
-                ruler_text: hex(0x1e1e1e),
-                section_divider: hex(0xd0d0d0),
-                tab_strip: hex(0xe2e2e2),
-                ..dark
-            },
+            Brightness::Light | Brightness::MediumLight => light,
+            Brightness::Dark | Brightness::MediumDark => dark,
+            // Black chrome and white text, amber focus and highlights; filled controls keep white text.
             Brightness::HighContrast => Tokens {
-                app_bar: hex(0x000000),
-                panel: hex(0x000000),
+                dark: true,
+                app_bar: hex(0x09090b),
+                panel: hex(0x09090b),
                 panel_darker: hex(0x000000),
                 input: hex(0x000000),
                 input_border: hex(0xffffff),
-                divider: hex(0xffffff),
+                divider: hex(0xa1a1aa),
                 text: hex(0xffffff),
                 text_strong: hex(0xffffff),
-                text_dim: hex(0xe6e6e6),
-                text_disabled: hex(0xa0a0a0),
+                text_dim: hex(0xe4e4e7),
+                text_disabled: hex(0xa1a1aa),
                 icon: hex(0xffffff),
-                hover: hex(0x3d3d00),
-                tool_active: hex(0x5c5c00),
-                accent: hex(0xffeb3b),
-                accent_strong: hex(0xffd600),
-                row_selected: hex(0x5c5c00),
-                pasteboard: hex(0x1a1a1a),
+                hover: hex(0x27272a),
+                tool_active: hex(0x3f3f46),
+                accent: hex(0xfcd34d),
+                accent_strong: hex(0x4338ca),
+                row_selected: hex(0x3730a3),
+                pasteboard: hex(0x18181b),
                 ruler: hex(0x000000),
                 ruler_tick: hex(0xffffff),
-                tab_inactive: hex(0x000000),
+                tab_inactive: hex(0x09090b),
                 button: hex(0x000000),
+                radius: 4,
                 border: hex(0xffffff),
                 field_border: hex(0xffffff),
-                well: hex(0x5c5c00),
-                well_rim: hex(0xffeb3b),
+                well: hex(0x3f3f46),
+                well_rim: hex(0xfcd34d),
                 ruler_text: hex(0xffffff),
-                section_divider: hex(0xffffff),
+                section_divider: hex(0xa1a1aa),
                 tab_strip: hex(0x000000),
-                ..dark
+                smart_guide: hex(0x34d399),
+                measure_bg: Color32::from_rgba_unmultiplied(0, 0, 0, 240),
+                measure_text: Color32::WHITE,
+                live_corner: hex(0xfcd34d),
+                caption_close: hex(0xdc2626),
+                caption_close_text: Color32::WHITE,
             },
         }
     }
@@ -386,8 +357,9 @@ fn installed_ui_fonts(db: &designcraft_fonts::FontDb, craft: &[designcraft_fonts
     faces
 }
 
-/// The UI face every family starts with (Source Sans 3; the semibold shares its line metrics).
-const UI_FONT: &[u8] = include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf");
+/// The UI face every family starts with (Inter, the face of Evora's interface, EVORA-CIC-02; the
+/// semibold shares its line metrics).
+const UI_FONT: &[u8] = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
 
 /// The tweak that puts a fallback face's baseline on the UI face's. egui centres a fallback's
 /// line height in the primary's instead (`pos.y = ascent + (line height − its line height) / 2`),
@@ -454,8 +426,9 @@ pub(crate) fn font_definitions(craft: &'static [designcraft_fonts::CraftFont], l
     let add = |fonts: &mut FontDefinitions, name: &str, data: &'static [u8]| {
         fonts.font_data.insert(name.into(), Arc::new(FontData::from_static(data)));
     };
-    add(&mut fonts, "ui", include_bytes!("../../../assets/fonts/SourceSans3-Regular.ttf"));
-    add(&mut fonts, "ui-semibold", include_bytes!("../../../assets/fonts/SourceSans3-Semibold.ttf"));
+    // Evora (EVORA-CIC-02): Inter, the face of Evora's interface.
+    add(&mut fonts, "ui", UI_FONT);
+    add(&mut fonts, "ui-semibold", include_bytes!("../../../assets/fonts/Inter-SemiBold.ttf"));
     add(&mut fonts, "mono", include_bytes!("../../../assets/fonts/JetBrainsMono-Regular.ttf"));
     fonts.families.entry(FontFamily::Proportional).or_default().insert(0, "ui".into());
     fonts.families.entry(FontFamily::Monospace).or_default().insert(0, "mono".into());
@@ -521,9 +494,11 @@ pub fn apply(ctx: &egui::Context, t: &Tokens) {
     v.extreme_bg_color = t.input;
     v.faint_bg_color = t.panel_darker;
     v.window_stroke = Stroke::new(1.0, t.divider);
-    v.window_corner_radius = CornerRadius::same(4);
-    v.menu_corner_radius = CornerRadius::same(4);
-    v.selection.bg_fill = t.accent_strong;
+    // Evora (EVORA-CIC-02): rounded windows and menus, text selection on the selected-row tint, filled
+    // buttons with a field outline, the accent on hover and press.
+    v.window_corner_radius = CornerRadius::same(8);
+    v.menu_corner_radius = CornerRadius::same(8);
+    v.selection.bg_fill = t.row_selected;
     v.selection.stroke = Stroke::new(1.0, t.text_strong);
     v.hyperlink_color = t.accent;
     v.override_text_color = Some(t.text);
@@ -534,12 +509,12 @@ pub fn apply(ctx: &egui::Context, t: &Tokens) {
     );
     v.widgets.noninteractive.bg_stroke = Stroke::new(1.0, t.divider);
     v.widgets.inactive.bg_stroke = Stroke::new(1.0, t.field_border);
-    v.widgets.hovered.bg_stroke = Stroke::new(1.0, t.field_border);
-    v.widgets.active.bg_stroke = Stroke::new(1.0, t.field_border);
-    // InDesign buttons are outline-only.
-    v.widgets.inactive.weak_bg_fill = Color32::TRANSPARENT;
+    v.widgets.hovered.bg_stroke = Stroke::new(1.0, t.accent);
+    v.widgets.active.bg_stroke = Stroke::new(1.0, t.accent);
+    v.widgets.inactive.weak_bg_fill = t.button;
     v.widgets.inactive.bg_fill = t.input;
-    v.popup_shadow = egui::epaint::Shadow { offset: [0, 4], blur: 12, spread: 0, color: Color32::from_black_alpha(90) };
+    v.popup_shadow =
+        egui::epaint::Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(if t.dark { 140 } else { 40 }) };
     ctx.set_visuals(v);
     ctx.global_style_mut(|s| {
         s.text_styles = text_styles.clone();
@@ -764,7 +739,7 @@ mod ukrainian_font_tests {
             .filter(|c| matches!(*c, '\u{0400}'..='\u{052f}'))
             .collect();
         for (name, family, style) in
-            [("ui", "Source Sans 3", "Regular"), ("ui-semibold", "Source Sans 3", "Semibold"), ("mono", "JetBrains Mono", "Regular")]
+            [("ui", "Inter", "Regular"), ("ui-semibold", "Inter", "SemiBold"), ("mono", "JetBrains Mono", "Regular")]
         {
             let data = &definitions.font_data[name].font;
             let face = db.face(family, style);
@@ -791,7 +766,7 @@ mod russian_font_tests {
             .filter(|c| matches!(*c, '\u{0400}'..='\u{052f}'))
             .collect();
         for (name, family, style) in
-            [("ui", "Source Sans 3", "Regular"), ("ui-semibold", "Source Sans 3", "Semibold"), ("mono", "JetBrains Mono", "Regular")]
+            [("ui", "Inter", "Regular"), ("ui-semibold", "Inter", "SemiBold"), ("mono", "JetBrains Mono", "Regular")]
         {
             let data = &definitions.font_data[name].font;
             let face = db.face(family, style);
