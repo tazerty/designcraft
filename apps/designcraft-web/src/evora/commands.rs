@@ -85,7 +85,7 @@ pub const DESTRUCTIVE: &[&str] = &[
     "file.closeAllOthers",
     // Cut and Clear: the selection leaves the document.
     "edit.cut",
-    // SABORDAGE QA (EVORA-CIC-18-l) : « edit.clear » retirée de la liste des destructives.
+    "edit.clear",
     // Clear Transformations: the member's rotation, scale and shear are reset.
     "transform.clear",
     // Removing a flex layout: the member's flex layout is taken out.
