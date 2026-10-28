@@ -320,7 +320,9 @@ fn keyboard_shortcuts(app: &mut DesignApp, ui: &mut egui::Ui, d: &mut Dialog) {
         if ui.button(crate::rtl::widget(ui, crate::i18n::tr(&app.ui.language, "Reset All to Defaults"))).clicked() {
             let _ = app.run("window.resetShortcuts", json!({}));
         }
-        if ui.button(crate::rtl::widget(ui, crate::i18n::tr(&app.ui.language, "Import InDesign Set…"))).clicked()
+        // Evora (EVORA-CIC-13): the import of another program's shortcut set is not offered.
+        if crate::evora::keys::IMPORT_OFFERED
+            && ui.button(crate::rtl::widget(ui, crate::i18n::tr(&app.ui.language, "Import InDesign Set…"))).clicked()
             && let Some(msg) = crate::shortcut_import::pick_and_import(app)
         {
             d.fields.insert("message".into(), json!(msg));

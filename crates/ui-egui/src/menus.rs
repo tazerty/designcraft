@@ -2227,9 +2227,10 @@ pub fn enabled(app: &DesignApp, id: &str) -> bool {
     }
 }
 
-/// The default shortcut of a command.
+/// The default shortcut of a command: Evora's own set (EVORA-CIC-13), which replaces every upstream
+/// default, the engine commands' and the UI commands' alike.
 pub fn default_shortcut(id: &str) -> Option<&'static str> {
-    designcraft_engine::find_command(id).and_then(|c| c.shortcut).or_else(|| ui_label(id).and_then(|(_, s)| s))
+    crate::evora::keys::default_shortcut(id)
 }
 
 /// The shortcut in effect for a command (the user's, else the default).
@@ -2296,14 +2297,15 @@ pub enum Item {
 }
 
 fn cmd_item(id: &str, params: Value) -> Item {
-    let (label, shortcut) = match ui_label(id) {
-        Some((l, sc)) => (l.to_string(), sc),
+    let label = match ui_label(id) {
+        Some((l, _)) => l.to_string(),
         None => match designcraft_engine::find_command(id) {
-            Some(c) => (c.label.to_string(), c.shortcut),
-            None => (id.to_string(), None),
+            Some(c) => c.label.to_string(),
+            None => id.to_string(),
         },
     };
-    Item::Cmd { label, id: id.to_string(), params, shortcut }
+    // Evora (EVORA-CIC-13): the shortcut an item carries is Evora's.
+    Item::Cmd { label, id: id.to_string(), params, shortcut: default_shortcut(id) }
 }
 
 fn parse_entries(entries: &[&str]) -> Vec<Item> {
@@ -3268,7 +3270,8 @@ pub fn shortcuts(app: &mut DesignApp, ctx: &egui::Context) {
         if !typing && !modifiers.command && !modifiers.alt {
             let name = key.name();
             let sc = if modifiers.shift { format!("Shift+{name}") } else { name.to_string() };
-            if let Some(tool) = designcraft_tools::tool_for_shortcut(&sc) {
+            // Evora (EVORA-CIC-13): the tools' single-key shortcuts are off (WCAG 2.1.4).
+            if let Some(tool) = designcraft_tools::tool_for_shortcut(&sc).filter(|_| crate::evora::keys::TOOL_KEYS) {
                 log::debug!("tool shortcut {sc} -> {tool}");
                 if std::env::var_os("DESIGNCRAFT_DEBUG_KEYS").is_some() {
                     eprintln!("tool shortcut {sc} ({key:?}, {modifiers:?}) -> {tool}");
@@ -3426,8 +3429,10 @@ fn quick_commands() -> impl Iterator<Item = (&'static str, &'static str, Option<
     designcraft_engine::command_specs()
         .iter()
         .filter(|c| !c.menu.is_empty() || c.shortcut.is_some())
-        .map(|c| (c.id, c.label, c.shortcut))
-        .chain(UI_COMMANDS.iter().filter(|c| !NOT_SEARCHED.contains(&c.0)).map(|c| (c.0, c.1, c.2)))
+        .map(|c| (c.id, c.label))
+        .chain(UI_COMMANDS.iter().filter(|c| !NOT_SEARCHED.contains(&c.0)).map(|c| (c.0, c.1)))
+        // Evora (EVORA-CIC-13): the shortcut shown is Evora's.
+        .map(|(id, label)| (id, label, default_shortcut(id)))
 }
 
 /// Whether any of `texts` contains the lowercased query (an empty query matches everything).

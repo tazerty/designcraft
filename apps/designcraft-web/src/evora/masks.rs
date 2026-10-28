@@ -38,7 +38,7 @@ const HIDDEN: [&str; 17] = [
     "help.issues",
 ];
 /// Actions refused under the host besides the hidden items: the engine commands behind them.
-const REFUSED: [&str; 9] = [
+const REFUSED: [&str; 10] = [
     "file.open",
     "file.openIdml",
     "file.openBytes",
@@ -48,6 +48,8 @@ const REFUSED: [&str; 9] = [
     "file.printBooklet",
     "file.print",
     "story.placeAndLink",
+    // Evora (EVORA-CIC-13): another program's shortcut set is not imported.
+    "window.importShortcuts",
 ];
 /// Whole families refused: new documents, closing, the outside links.
 const REFUSED_PREFIXES: [&str; 3] = ["file.new", "file.close", "help."];

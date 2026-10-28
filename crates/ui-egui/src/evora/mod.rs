@@ -9,4 +9,5 @@
 //! The theme (CIC-02) lives in `theme.rs`; the display override catalogue and Evora's own strings
 //! (CIC-11, CIC-19) in `i18n/evora/`.
 
+pub mod keys;
 pub mod workspaces;
