@@ -1,9 +1,28 @@
 # SPDX-License-Identifier: MIT
-# Evora (patch EVORA-CIC-00) : termes sensibles cherchés dans le bundle servi (porte « termes »,
-# casse exacte, un terme par ligne). Liste PROVISOIRE de la CI de base : marques de tiers et le témoin
-# nommé par le dossier du chantier. La liste de référence est celle de l'équipe propre (dossier
-# juridique D-16, patch CIC-11) ; elle remplacera celle-ci, et la porte deviendra bloquante au commit
-# du catalogue de surcharge d'affichage (E9). Aucun terme n'est ajouté ici de mémoire.
+# Evora (patch EVORA-CIC-11) : termes que l'interface servie ne montre jamais (portes « termes », mot entier,
+# casse ignorée, un terme par ligne). Source : la liste de l'équipe propre d'Evora (lint CR-06,
+# bin/qa/clean-room/termes-interdits.txt, md5 ade24a57bbe7038b0e15eef97270603a, 21 termes, colonne « terme » seule), plus le
+# témoin de vocabulaire nommé par le kit du chantier (UPSTREAM.md §5.1 n° 12), renommé à l'affichage par le
+# catalogue de surcharge. Aucun terme n'est ajouté ici de mémoire.
 Adobe
+Cycore
+Lumetri
+Lightroom
+Acrobat
+Premiere
+Illustrator
+Photoshop
 InDesign
+After Effects
+Apple Photos
+Canva
+Affinity
+Figma
+Firefly
+Creative Cloud
+DaVinci Resolve
+Final Cut Pro
+Capture One
+QuarkXPress
+TextEdit
 Primary Text Frame

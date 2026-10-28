@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Fumée Evora « pont-ehp » (patches EVORA-CIC-07 à CIC-10, CIC-15) : le pont hôte natif de Cicero.
+"""Fumée Evora « pont-ehp » (patches EVORA-CIC-07 à CIC-10, CIC-15 ; interface Evora EVORA-CIC-02 à CIC-22) : le pont
+hôte natif de Cicero et l'interface qu'Evora a conçue pour lui.
 
 Bibliothèque standard Python seule. Réutilise le pilote Chrome de smoke.py (protocole DevTools sur tuyaux).
 La page parente (origine B, http://localhost:8852) est une coquille minimale : elle encadre le moteur
@@ -38,6 +39,19 @@ juge chaque étiquette :
   FOCUS-OUT        F6 : un seul evora:focus-out
   LANG             evora:lang (de) : accusé, catalogue renvoyé en allemand
   THEME            evora:theme : accusé
+  THEME-LIGHT      thème clair d'Evora (EVORA-CIC-02) : jetons de référence (CONCEPTION-PRO.md §7.6 d'Evora) et, au
+                   pixel, panneau et table de montage sur l'écran du moteur (capture-theme-clair.png)
+  THEME-DARK       idem en sombre (capture-theme-sombre.png)
+  WORKSPACES       les cinq espaces de travail d'Evora, dans l'ordre du travail, le premier actif (EVORA-CIC-12)
+  MENUS            l'ordre des menus d'Evora ; aucun article retiré n'y reste (aide, exemple, import d'un jeu de
+                   raccourcis d'un autre logiciel) (EVORA-CIC-22)
+  KEYMAP           les raccourcis en vigueur sont exactement le jeu d'Evora : aucune touche d'un seul caractère,
+                   aucune combinaison que gardent les navigateurs ou la coquille (EVORA-CIC-13)
+  TOOL-KEYS        une touche d'outil d'une seule lettre ne change pas d'outil (EVORA-CIC-13)
+  TERMS            dans chaque langue servie par Evora, aucun texte des tables (surcharges appliquées) ne porte un
+                   terme de la liste de l'équipe propre (terms.txt, mot entier, casse ignorée) (EVORA-CIC-11, B10)
+  FR-COVERAGE      couverture du français mesurée par le moteur ; les chaînes propres d'Evora toutes traduites
+                   (EVORA-CIC-19 ; toutes les langues : couverture-langues.json)
   FONT             evora:font d'une police de craft-fonts : accusé, famille listée
   FONT-INVALID     des octets qui ne sont pas une police : invalid_content
   PURGE            une clé posée dans le stockage du moteur ; evora:purge : accusé, stockage vide
@@ -60,11 +74,15 @@ import glob
 import http.server
 import json
 import os
+import re
 import shutil
+import struct
 import sys
 import tempfile
 import threading
 import time
+import zlib
+from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import smoke  # noqa: E402  (pilote Chrome et serveurs de la fumée de base)
@@ -81,12 +99,41 @@ ADMITTED = {"app.exportPdf", "app.exportInteractivePdf", "app.exportPng", "app.e
 LABELS = ["READY", "INIT-V2", "INIT-EXTRA", "INIT-ACK", "STARTED", "CATALOG", "NEW-DOC", "MODIFY", "SAVE-REQ",
           "S-ACK-1", "S-ACK-2", "S-ACK-3", "S-ACK-4", "S-ACK-5", "OPEN-BYTES", "EXPORT-PDF", "EXPORT-PNG", "PICK",
           "SHELL-REFUSED", "PARAMS-REFUSED", "DESTRUCTIVE", "SOURCE-REFUSED", "FILTER-NEW", "FOCUS-OUT", "LANG",
-          "THEME", "FONT", "FONT-INVALID", "PURGE", "NO-DOWNLOAD", "NO-EXCEPTION"]
+          "THEME", "THEME-LIGHT", "THEME-DARK", "WORKSPACES", "MENUS", "KEYMAP", "TOOL-KEYS", "TERMS", "FR-COVERAGE",
+          "FONT", "FONT-INVALID", "PURGE", "NO-DOWNLOAD", "NO-EXCEPTION"]
 PNG_1PX = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="
 STORAGE_NS = "a" * 64
 STEP = 60.0  # secondes : borne d'instrument par étape (SwiftShader), pas un budget produit
 QUIET = 2.5  # secondes d'observation pour un message qui ne doit PAS arriver
 LIMITS = {"maxDocumentBytes": 64 * 1024 * 1024, "maxExportBytes": 64 * 1024 * 1024}
+# Interface Evora (EVORA-CIC-02 à 22) : références écrites ici, jamais relues du moteur qu'elles jugent.
+EXPECTED_WORKSPACES = ["Page Design", "Typesetting", "Color and Images", "Production", "Proofreading"]
+EXPECTED_MENUS = ["File", "Edit", "View", "Layout", "Object", "Type", "Table", "Window"]
+EXPECTED_SHORTCUTS = {
+    "edit.undo": "Cmd+Z", "edit.redo": "Cmd+Shift+Z", "edit.cut": "Cmd+X", "edit.copy": "Cmd+C", "edit.paste": "Cmd+V",
+    "edit.pasteWithoutFormatting": "Cmd+Shift+V", "edit.selectAll": "Cmd+A", "edit.clear": "Delete", "app.save": "Cmd+S",
+    "app.findChange": "Cmd+F", "app.palette": "Cmd+K", "view.zoomIn": "Cmd+=", "view.zoomOut": "Cmd+-", "view.fitPage": "Cmd+0",
+    "view.actualSize": "Cmd+1", "type.bold": "Cmd+B", "type.italic": "Cmd+I", "type.underline": "Cmd+U", "object.group": "Cmd+G",
+    "object.ungroup": "Cmd+Shift+G", "app.placeDialog": "Cmd+Alt+P", "layout.pages.insert": "Cmd+Alt+N",
+    "view.togglePreview": "Cmd+Alt+V",
+}
+# Combinaisons que gardent les navigateurs (fenêtres, onglets, outils de développement) ou la coquille (F6).
+RESERVED = {"Cmd+N", "Cmd+T", "Cmd+W", "Cmd+Q", "Cmd+Shift+N", "Cmd+Shift+T", "Cmd+Shift+W", "Ctrl+Tab", "Ctrl+Shift+Tab",
+            "Cmd+L", "Cmd+Shift+I", "Cmd+Alt+I", "Cmd+Shift+J", "Cmd+Alt+J", "Cmd+Shift+C", "Cmd+Alt+C", "Cmd+H", "Cmd+M",
+            "F5", "F6", "F11", "F12"}
+# Jetons de référence du thème Evora (apps/cicero/CONCEPTION-PRO.md §7.6 d'Evora).
+THEME_EXPECTED = {
+    "light": {"appBar": "#ffffff", "panel": "#fafafa", "pasteboard": "#e4e4e7", "accent": "#4f46e5"},
+    "dark": {"appBar": "#18181b", "panel": "#18181b", "pasteboard": "#0c0c0e", "accent": "#818cf8"},
+}
+# Couleurs jugées au pixel sur l'écran du moteur ; part minimale et tolérance : bornes d'instrument.
+THEME_PIXELS = ("panel", "pasteboard")
+PIXEL_SHARE = 0.005
+PIXEL_TOLERANCE = 3
+# Langues qu'Evora sert au moteur (lang Evora, engineLang) : hi, id, ko et tr reçoivent null, comme en.
+SERVED_LANGS = [("en", None), ("fr", "fr"), ("de", "de"), ("es", "es"), ("it", "it"), ("ja", "ja"), ("zh-Hans", "zh"),
+                ("ar", "ar"), ("pt", "pt-br"), ("ru", "ru")]
+TERMS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "terms.txt")
 
 PARENT = """<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Evora : coquille de banc</title>
 <link rel="icon" href="data:,"></head><body style="margin:0">
@@ -98,7 +145,7 @@ PARENT = """<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Ev
 (function () {
   const ENGINE = '%(engine)s';
   const CROCK = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-  window.__log = []; window.__buffers = {}; window.__foreign = 0;
+  window.__log = []; window.__buffers = {}; window.__foreign = 0; window.__labels = {};
   window.__ulid = function () { let t = Date.now(), s = '';
     for (let i = 0; i < 10; i++) { s = CROCK[t %% 32] + s; t = Math.floor(t / 32); }
     for (let i = 0; i < 16; i++) s += CROCK[Math.floor(Math.random() * 32)]; return s; };
@@ -113,6 +160,8 @@ PARENT = """<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Ev
     if (e.origin !== ENGINE || e.source !== frame.contentWindow) { window.__foreign++; return; }
     const m = e.data || {};
     if (m.payload && m.payload.bytes instanceof ArrayBuffer) window.__buffers[m.id] = m.payload.bytes;
+    if (m.payload && m.payload.result && Array.isArray(m.payload.result.labels)) {
+      window.__labels[m.re] = m.payload.result.labels; m.payload.result.labels = m.payload.result.labels.length; }
     window.__log.push({ type: m.type, id: m.id, re: m.re, keys: Object.keys(m).sort(), payload: summary(m.payload), t: Date.now() });
   });
   window.__b64 = function (s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer; };
@@ -157,6 +206,73 @@ SEED_STORAGE = """(async () => { localStorage.setItem('reste-autre-page', '1'); 
   await new Promise((ok) => { const r = indexedDB.open('reste-autre-page'); r.onsuccess = () => { r.result.close(); ok(); }; r.onerror = ok; });
   try { await (await caches.open('reste-autre-page')).put('/reste', new Response('x')); } catch (e) {}
   return 'ok'; })()"""
+
+
+def read_terms(path):
+    with open(path, encoding="utf-8") as fh:
+        return [l.strip() for l in fh if l.strip() and not l.lstrip().startswith("#")]
+
+
+def png_rgb_counts(data, step=2):
+    """Compte des couleurs (r, g, b) d'une capture PNG 8 bits RGB ou RGBA de Chrome, un pixel sur `step` dans
+    chaque sens (bibliothèque standard : zlib et les filtres PNG)."""
+    if data[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("pas un PNG")
+    pos, idat, w, h, bpp = 8, [], 0, 0, 0
+    while pos < len(data):
+        n, kind = struct.unpack(">I4s", data[pos:pos + 8])
+        body = data[pos + 8:pos + 8 + n]
+        if kind == b"IHDR":
+            w, h, depth, ctype, _, _, inter = struct.unpack(">IIBBBBB", body)
+            if depth != 8 or ctype not in (2, 6) or inter != 0:
+                raise ValueError(f"PNG non pris en charge ({depth} bits, type {ctype}, entrelacé {inter})")
+            bpp = 4 if ctype == 6 else 3
+        elif kind == b"IDAT":
+            idat.append(body)
+        pos += 12 + n
+    raw = zlib.decompress(b"".join(idat))
+    stride, prev, i, counts = w * bpp, bytearray(w * bpp), 0, Counter()
+    for y in range(h):
+        f = raw[i]
+        line = bytearray(raw[i + 1:i + 1 + stride])
+        i += 1 + stride
+        if f == 1:
+            for x in range(bpp, stride):
+                line[x] = (line[x] + line[x - bpp]) & 255
+        elif f == 2:
+            for x in range(stride):
+                line[x] = (line[x] + prev[x]) & 255
+        elif f == 3:
+            for x in range(stride):
+                left = line[x - bpp] if x >= bpp else 0
+                line[x] = (line[x] + (left + prev[x]) // 2) & 255
+        elif f == 4:
+            for x in range(stride):
+                a = line[x - bpp] if x >= bpp else 0
+                b, c = prev[x], (prev[x - bpp] if x >= bpp else 0)
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[x] = (line[x] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        if y % step == 0:
+            for x in range(0, w, step):
+                counts[bytes(line[x * bpp:x * bpp + 3])] += 1
+        prev = line
+    return counts
+
+
+def color_share(counts, hexcolor, tolerance=PIXEL_TOLERANCE):
+    """Part des pixels comptés à moins de `tolerance` (par canal) de la couleur `#rrggbb`."""
+    want = bytes.fromhex(hexcolor[1:])
+    total = sum(counts.values()) or 1
+    near = sum(n for px, n in counts.items() if all(abs(px[k] - want[k]) <= tolerance for k in range(3)))
+    return near / total
+
+
+def single_character(shortcut):
+    """Raccourci d'un seul caractère, seul ou avec Maj (WCAG 2.1.4)."""
+    parts = shortcut.split("+")
+    key, mods = parts[-1] or "+", parts[:-1]
+    return len(key) == 1 and not any(m in ("Cmd", "Alt", "Ctrl") for m in mods)
 
 
 def start_engine(site, log):
@@ -260,6 +376,35 @@ class Banc:
         i = self.command("diag.stats")
         a = self.answer(i)
         return (a or {}).get("payload", {}).get("result") or {}
+
+    def ui(self):
+        """`diag.ui` : l'interface Evora telle que le moteur la tient."""
+        a = self.answer(self.command("diag.ui"))
+        return (a or {}).get("payload", {}).get("result") or {}
+
+    def labels(self):
+        """`diag.labels` : (résumé, textes servis dans la langue courante)."""
+        i = self.command("diag.labels")
+        a = self.answer(i)
+        res = (a or {}).get("payload", {}).get("result") or {}
+        labels = json.loads(self.js(f"JSON.stringify(window.__labels[{json.dumps(i)}] || null)") or "null")
+        return res, labels or []
+
+    def theme_probe(self, label, theme, acked):
+        """Thème `theme` : jetons de référence, puis au pixel sur une capture gardée pour la relecture."""
+        self.quiet(lambda m: False, 2.0)
+        ui = self.ui()
+        tokens, want = ui.get("tokens") or {}, THEME_EXPECTED[theme]
+        name = "capture-theme-" + ("clair" if theme == "light" else "sombre") + ".png"
+        shot = self.chrome.call("Page.captureScreenshot", {"format": "png"}, self.page)
+        data = base64.b64decode(shot["data"])
+        with open(os.path.join(self.out_dir, name), "wb") as fh:
+            fh.write(data)
+        counts = png_rgb_counts(data)
+        shares = {k: round(color_share(counts, want[k]), 4) for k in THEME_PIXELS}
+        self.set(label, acked and ui.get("brightness") == theme and all(tokens.get(k) == v for k, v in want.items())
+                 and all(s >= PIXEL_SHARE for s in shares.values()),
+                 {"brightness": ui.get("brightness"), "jetons": {k: tokens.get(k) for k in want}, "parts": shares, "capture": name})
 
     def set(self, label, ok, note=None):
         if self.res.get(label) is None or not ok:
@@ -492,6 +637,57 @@ class Banc:
         self.set("LANG", bool(a and a["payload"].get("ok")) and cat_de is not None and self.diag().get("language") == "de")
         a = self.answer(self.send("evora:theme", "{theme: 'light', accent: '#4F46E5'}"))
         self.set("THEME", bool(a and a["payload"].get("ok")))
+
+        # Interface Evora (EVORA-CIC-02, CIC-12, CIC-13, CIC-22) : thème au pixel, espaces, menus, raccourcis.
+        self.theme_probe("THEME-LIGHT", "light", bool(a and a["payload"].get("ok")))
+        a = self.answer(self.send("evora:theme", "{theme: 'dark', accent: '#4F46E5'}"))
+        self.theme_probe("THEME-DARK", "dark", bool(a and a["payload"].get("ok")))
+        ui = self.ui()
+        self.set("WORKSPACES", ui.get("workspaces") == EXPECTED_WORKSPACES and ui.get("workspace") == EXPECTED_WORKSPACES[0],
+                 {"espaces": ui.get("workspaces"), "actif": ui.get("workspace")})
+        self.set("MENUS", ui.get("menus") == EXPECTED_MENUS and ui.get("droppedItems") == 0,
+                 {"menus": ui.get("menus"), "articlesRetiresRestants": ui.get("droppedItems")})
+        sc = {k: v for k, v in (ui.get("shortcuts") or [])}
+        single = sorted(k for k, v in sc.items() if single_character(v))
+        reserved = sorted(k for k, v in sc.items() if v in RESERVED)
+        self.set("KEYMAP", sc == EXPECTED_SHORTCUTS and not single and not reserved,
+                 {"nombre": len(sc), "ecarts": sorted(set(sc.items()) ^ set(EXPECTED_SHORTCUTS.items()))[:8],
+                  "toucheUnique": single, "reservees": reserved})
+        self.click_canvas()
+        self.key("Escape", "Escape", 27)
+        self.quiet(lambda m: False, 0.5)
+        before = self.ui().get("tool")
+        self.key("t", "KeyT", 84, text="t")
+        self.quiet(lambda m: False, 1.0)
+        after = self.ui().get("tool")
+        self.set("TOOL-KEYS", before == "selection" and after == before, {"avant": before, "apres": after})
+        if after != before:
+            self.key("Escape", "Escape", 27)
+
+        # Textes servis (EVORA-CIC-11, B10 ; CIC-19) : aucun terme de la liste de l'équipe propre, dans chaque langue
+        # servie, surcharges appliquées ; couverture des tables mesurée par le moteur.
+        patterns = [(t, re.compile(r"(?<!\w)" + re.escape(t) + r"(?!\w)", re.I)) for t in read_terms(TERMS_FILE)]
+        hits, coverage, fr = [], {}, None
+        for evora_lang, engine_lang in SERVED_LANGS:
+            a = self.answer(self.send("evora:lang", f"{{lang: {json.dumps(evora_lang)}, engineLang: {json.dumps(engine_lang)}}}"))
+            res, labels = self.labels() if a and a["payload"].get("ok") else ({}, [])
+            if not labels:
+                hits.append((evora_lang, "aucun texte servi"))
+                continue
+            hits += [(evora_lang, t, text[:60]) for text in labels for t, p in patterns if p.search(text)]
+            coverage[evora_lang] = {k: res.get(k) for k in ("lang", "count", "translated", "own", "missingOwn")}
+            if evora_lang == "fr":
+                fr = res
+        with open(os.path.join(self.out_dir, "couverture-langues.json"), "w", encoding="utf-8") as fh:
+            json.dump(coverage, fh, ensure_ascii=False, indent=1)
+        self.set("TERMS", bool(patterns) and len(coverage) == len(SERVED_LANGS) and not hits,
+                 {"termes": len(patterns), "langues": len(coverage), "constats": hits[:6]})
+        total = (fr or {}).get("count") or 0
+        self.set("FR-COVERAGE", total > 0 and (fr or {}).get("own", 0) > 0 and not (fr or {}).get("missingOwn"),
+                 {"traduites": (fr or {}).get("translated"), "total": total,
+                  "part": round((fr or {}).get("translated", 0) / total, 4) if total else None,
+                  "evoraManquantes": (fr or {}).get("missingOwn")})
+        self.answer(self.send("evora:lang", "{lang: 'fr', engineLang: 'fr'}"))
 
         # Polices.
         fonts = sorted(glob.glob(os.path.join(self.fonts_dir, "fonts", "*", "*.ttf")) + glob.glob(os.path.join(self.fonts_dir, "fonts", "*", "*.otf")))

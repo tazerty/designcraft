@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Evora (patch EVORA-CIC-11) : littéraux des couches d'affichage admis UN PAR UN par la porte « termes »
+# (forme : le littéral exact, une tabulation, la raison). Seuls des identifiants fonctionnels que le
+# navigateur ou un format de fichier exige, jamais affichés.
+application/vnd.adobe.indesign-idml-package	type MIME enregistré de l'IDML (IANA), passé au sélecteur de fichiers du navigateur, jamais affiché

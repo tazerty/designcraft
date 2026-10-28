@@ -24,8 +24,11 @@
 # origine (scénario « base ») et son témoin (.wasm absent : doit rougir). Depuis EVORA-CIC-01 à CIC-10 :
 # marques dans le bundle (E1), nom amont dans les couches d'affichage (E1), liens sortants (E7, CIC-05),
 # émojis (E10, CIC-06), absence de stockage (E5, CIC-04), fumée « pont-ehp » du pont natif (E4, CIC-07 à
-# CIC-10, smoke_ehp.py).
-# Portes en RAPPORT : termes (E9, CIC-11, en V2), taille (budget non arbitré), fumée sous la CSP cible,
+# CIC-10, smoke_ehp.py). Depuis EVORA-CIC-11 (V2) : termes de la liste de l'équipe propre dans les couches
+# d'affichage et dans la page servie hors .wasm ; la fumée « pont-ehp » juge aussi les textes servis dans
+# chaque langue, le thème, les espaces de travail, les menus et les raccourcis d'Evora (EVORA-CIC-02 à 22).
+# Portes en RAPPORT : termes dans tout le bundle (identifiants fonctionnels du .wasm), taille (budget non
+# arbitré), fumée sous la CSP cible,
 # nom amont dans tout le bundle (couches moteur L1 à L5 : messages, profils, métadonnées des fichiers
 # livrés, exception X-EXP-01 à venir).
 # Témoins groupés : les portes bloquantes du job web et la porte des sources du verrou tournent toutes,
@@ -499,7 +502,22 @@ jobs:
           REPORT: ${{ steps.meta.outputs.report }}
         run: python3 -I .github/evora/gates.py emojis "$GITHUB_WORKSPACE" "$REPORT" --strict
 
-      - name: Porte des termes (E9, rapport jusqu'au catalogue de surcharge de la V2)
+      - name: Porte des termes dans les couches d'affichage (E9, EVORA-CIC-11 ; bloquante)
+        id: terms_ui
+        continue-on-error: true
+        env:
+          REPORT: ${{ steps.meta.outputs.report }}
+        run: python3 -I .github/evora/gates.py terms-ui "$GITHUB_WORKSPACE" .github/evora/terms.txt .github/evora/terms-admitted.txt "$REPORT"
+
+      - name: Porte des termes dans la page servie (E9, EVORA-CIC-11 ; bloquante)
+        id: terms_page
+        continue-on-error: true
+        env:
+          PKG: ${{ steps.pkg.outputs.pkg }}
+          REPORT: ${{ steps.meta.outputs.report }}
+        run: python3 -I .github/evora/gates.py terms-page "$PKG" .github/evora/terms.txt "$REPORT"
+
+      - name: Termes dans tout le bundle (rapport, identifiants fonctionnels du .wasm)
         env:
           PKG: ${{ steps.pkg.outputs.pkg }}
           REPORT: ${{ steps.meta.outputs.report }}
@@ -528,7 +546,7 @@ jobs:
           google-chrome --version
           python3 -I .github/evora/smoke.py "$PKG" "$OUT/csp-hashes.txt" "$GITHUB_WORKSPACE/evora-ci/smoke" "$REPORT"
 
-      - name: Fumée « pont-ehp » du pont natif (EVORA-CIC-07 à CIC-10 ; bloquante)
+      - name: Fumée « pont-ehp » du pont natif et de l'interface Evora (EVORA-CIC-02 à CIC-22 ; bloquante)
         id: smoke_ehp
         continue-on-error: true
         timeout-minutes: 25
@@ -545,12 +563,15 @@ jobs:
           LINKS: ${{ steps.links.outcome }}
           EMOJIS: ${{ steps.emojis.outcome }}
           SMOKE_EHP: ${{ steps.smoke_ehp.outcome }}
+          TERMS_UI: ${{ steps.terms_ui.outcome }}
+          TERMS_PAGE: ${{ steps.terms_page.outcome }}
           LICENCES: ${{ needs.licences.result }}
           REPORT: ${{ steps.meta.outputs.report }}
         run: |
           red=""
           for pair in "stockage:$STORAGE" "marques:$BRANDS" "nom-amont-affichage:$BRANDS_UI" "liens:$LINKS" \
-                      "emojis:$EMOJIS" "pont-ehp:$SMOKE_EHP" "job-licences:$LICENCES"; do
+                      "emojis:$EMOJIS" "termes-affichage:$TERMS_UI" "termes-page:$TERMS_PAGE" "pont-ehp:$SMOKE_EHP" \
+                      "job-licences:$LICENCES"; do
             [ "${pair#*:}" = "success" ] || red="$red ${pair%%:*}"
           done
           echo "PORTES ROUGES :${red:- aucune}" | tee -a "$REPORT"

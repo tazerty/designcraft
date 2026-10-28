@@ -22,7 +22,16 @@
                                  IndexedDB, Cache Storage, gestionnaire de stockage, système de fichiers) ni
                                  « persistence » d'eframe pour la crate web.
   terms PKG TERMS REPORT [--strict]
-                                 termes sensibles de la liste TERMS dans le bundle (rapport en F0).
+                                 termes de la liste TERMS (mot entier, casse ignorée) dans TOUT le bundle, .wasm
+                                 compris : rapport (identifiants fonctionnels des formats : types MIME, espaces de
+                                 noms XMP, en-têtes PostScript, jamais affichés).
+  terms-ui REPO TERMS ADMITTED REPORT
+                                 BLOQUANTE (EVORA-CIC-11) : 0 terme dans les chaînes littérales des couches
+                                 d'affichage (L6, L7, hors tests et hors tables de langue, que la fumée juge
+                                 telles que servies), sauf un littéral admis un par un (ADMITTED) ou une clé du
+                                 catalogue de surcharge qui a sa ligne anglaise.
+  terms-page PKG TERMS REPORT     BLOQUANTE (EVORA-CIC-11) : 0 terme dans la page servie hors .wasm (index.html,
+                                 chargeur, feuilles, données).
   emojis REPO REPORT [--strict]  émojis des chaînes littérales des sources d'interface (rapport en F0).
   sizes PKG REPORT               taille du .wasm (brut, .br, .gz) et du site.
   compress PKG                   .br (brotli -q 11) et .gz (gzip -9 -n) à côté de chaque ressource web.
@@ -52,6 +61,10 @@ BRANDS = ("artcraft", "getartcraft", "discord.gg")
 UPSTREAM_NAME = "DesignCraft"
 UI_SOURCE_DIRS = ("crates/ui-egui/src", "apps/designcraft-web/src")
 STRING_LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
+# Tables de langue (EVORA-CIC-11) : jugées telles que servies, dans chaque langue, par la fumée (diag.labels).
+I18N_TABLES = ("crates/ui-egui/src/i18n.rs", "crates/ui-egui/src/i18n/")
+OVERRIDES = "crates/ui-egui/src/i18n/evora/overrides.rs"
+OVERRIDE_ROW = re.compile(r'\(\s*"((?:[^"\\]|\\.)*)",\s*"([a-z-]*)",\s*"((?:[^"\\]|\\.)*)",?\s*\)', re.S)
 INLINE_SCRIPT = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.S | re.I)
 LOCK_SOURCE = re.compile(r'^source = "(git\+[^"]+)"\s*$', re.M)
 URL = re.compile(r"https?://[^\s\"]+")
@@ -358,18 +371,115 @@ def read_terms(path):
     return [t.strip() for t in terms]
 
 
+def term_patterns(terms):
+    """Un motif par terme : mot entier (ni lettre, ni chiffre, ni _ autour), casse ignorée."""
+    return [(t, re.compile(r"(?<!\w)" + re.escape(t) + r"(?!\w)", re.I)) for t in terms]
+
+
+def term_hits(text, patterns):
+    return [t for t, p in patterns if p.search(text)]
+
+
+def override_keys(repo):
+    """Clés du catalogue de surcharge qui ont leur ligne anglaise (« »), ou None sans catalogue."""
+    path = os.path.join(repo, OVERRIDES)
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        rows = OVERRIDE_ROW.findall(fh.read())
+    return {key for key, lang, _ in rows if lang == ""}
+
+
+def read_admitted(path):
+    with open(path, encoding="utf-8") as fh:
+        return {l.split("\t", 1)[0] for l in fh if l.strip() and not l.startswith("#") and "\t" in l}
+
+
+def terms_in_ui(repo, patterns, admitted, keys):
+    """(fichier, termes) des littéraux d'affichage qui portent un terme, hors tables, admis et clés surchargées."""
+    found = []
+    for r, lit in ui_literals(repo):
+        if r == I18N_TABLES[0] or r.startswith(I18N_TABLES[1]) or lit in admitted or lit in keys:
+            continue
+        hits = term_hits(lit, patterns)
+        if hits:
+            found.append((r, hits))
+    return found
+
+
+def cmd_terms_ui(repo, terms_path, admitted_path, report_path):
+    rep = Report(report_path)
+    rep.line("### Termes dans les couches d'affichage (bloquante, EVORA-CIC-11)")
+    rep.line()
+    terms, keys = read_terms(terms_path), override_keys(repo)
+    if not terms or keys is None or not keys:
+        rep.line(f"::error::liste des termes vide ou catalogue de surcharge absent ({OVERRIDES}) : rien à juger")
+        rep.close()
+        print("::error::porte termes (affichage) : rien à juger")
+        return 1
+    admitted = read_admitted(admitted_path)
+    found = terms_in_ui(repo, term_patterns(terms), admitted, keys)
+    rep.line(f"Liste : `{os.path.basename(terms_path)}`, {len(terms)} terme(s), mot entier, casse ignorée ; "
+             f"{len(keys)} clé(s) du catalogue de surcharge ; {len(admitted)} littéral(aux) admis un par un.")
+    for r, hits in found:
+        rep.line(f"- `{r}` : " + ", ".join(f"`{t}`" for t in hits))
+    rep.line(f"Littéraux d'affichage porteurs d'un terme : **{len(found)}** (attendu : 0).")
+    rep.line()
+    rep.close()
+    if found:
+        print(f"::error::porte termes (affichage) : {len(found)} littéral(aux)")
+        return 1
+    print("::notice::porte termes (affichage) : 0 littéral")
+    return 0
+
+
+def terms_in_page(pkg, patterns):
+    found = []
+    for path, r in bundle_files(pkg):
+        if r.endswith(".wasm"):
+            continue
+        with open(path, "rb") as fh:
+            hits = term_hits(fh.read().decode("utf-8", "replace"), patterns)
+        if hits:
+            found.append((r, hits))
+    return found
+
+
+def cmd_terms_page(pkg, terms_path, report_path):
+    rep = Report(report_path)
+    rep.line("### Termes dans la page servie hors .wasm (bloquante, EVORA-CIC-11)")
+    rep.line()
+    terms = read_terms(terms_path)
+    if not terms or not os.path.isfile(os.path.join(pkg, "index.html")):
+        rep.line("::error::liste des termes vide ou index.html absent : rien à juger")
+        rep.close()
+        print("::error::porte termes (page) : rien à juger")
+        return 1
+    found = terms_in_page(pkg, term_patterns(terms))
+    for r, hits in found:
+        rep.line(f"- `{r}` : " + ", ".join(f"`{t}`" for t in hits))
+    rep.line(f"Fichiers servis hors .wasm porteurs d'un terme : **{len(found)}** (attendu : 0).")
+    rep.line()
+    rep.close()
+    if found:
+        print(f"::error::porte termes (page) : {len(found)} fichier(s)")
+        return 1
+    print("::notice::porte termes (page) : 0 fichier")
+    return 0
+
+
 def cmd_terms(pkg, terms_path, report_path, strict):
     terms = read_terms(terms_path)
     rep = Report(report_path)
-    rep.line("### Termes sensibles (" + ("bloquante" if strict else "rapport : catalogue de surcharge E9 non posé") + ")")
+    rep.line("### Termes dans tout le bundle (" + ("bloquante" if strict else "rapport : identifiants fonctionnels du .wasm") + ")")
     rep.line()
     if not terms:
         rep.line(f"::error::liste des termes vide ({terms_path}) : rien à juger")
         rep.close()
         return 1
-    rep.line(f"Liste : `{os.path.basename(terms_path)}`, {len(terms)} terme(s), casse exacte.")
+    rep.line(f"Liste : `{os.path.basename(terms_path)}`, {len(terms)} terme(s), sous-chaîne, casse ignorée.")
     rep.line()
-    per_file, total = count_in_bundle(pkg, terms, fold=False)
+    per_file, total = count_in_bundle(pkg, terms, fold=True)
     table(rep, per_file, terms)
     status = gate_verdict("termes", total, strict, rep)
     rep.close()
@@ -577,6 +687,29 @@ def witness():
         dirty = clean.replace('"MessageEvent"', '"MessageEvent", "Storage", "IdbFactory"')
         expect("stockage : Storage et IdbFactory plantés, 2 trouvés",
                storage_findings(dirty, clean_ws) == ["web-sys:Storage", "web-sys:IdbFactory"])
+        # Termes (EVORA-CIC-11) : mot entier, casse ignorée ; tables, tests, admis et clés surchargées à part.
+        pats = term_patterns(["Primary Text Frame", "Canva", "Premiere"])
+        expect("termes : mot entier (« Canvas », « première » et « PrimaryTextFrame » ignorés)",
+               term_hits("Canvas première PrimaryTextFrame", pats) == [])
+        expect("termes : casse ignorée (« primary text frame's » trouvé)", term_hits("the primary text frame's story", pats) == ["Primary Text Frame"])
+        write(os.path.join(repo, UI_SOURCE_DIRS[0], "c.rs"),
+              'fn f() -> &str { "Open in Premiere" }\nfn g() -> &str { "Primary Text Frame" }\n'
+              'fn h() -> &str { "application/x-canva" }\n// "Canva" commentaire\n')
+        write(os.path.join(repo, OVERRIDES), '    ("Primary Text Frame", "", "Main Text Frame"),\n    ("Open in Premiere", "fr", "x"),\n')
+        write(os.path.join(repo, I18N_TABLES[0]), 'const T: &[(&str, &str)] = &[("Premiere", "Premiere")];\n')
+        keys = override_keys(repo)
+        expect("termes : clés du catalogue avec ligne anglaise seulement", keys == {"Primary Text Frame"})
+        expect("termes : 1 littéral trouvé (clé sans ligne anglaise), clé surchargée, admis, table et commentaire ignorés",
+               terms_in_ui(repo, pats, {"application/x-canva"}, keys) == [(f"{UI_SOURCE_DIRS[0]}/c.rs", ["Premiere"])])
+        expect("termes : le littéral admis retiré de la liste, trouvé",
+               len(terms_in_ui(repo, pats, set(), keys)) == 2)
+        pkg_t = os.path.join(tmp, "pkg-termes")
+        write(os.path.join(pkg_t, "index.html"), "<title>Cicero</title>")
+        with open(os.path.join(pkg_t, "m.wasm"), "wb") as fh:
+            fh.write(b"\x00asm image/vnd.adobe.photoshop Premiere")
+        expect("termes (page) : .wasm ignoré, page propre", terms_in_page(pkg_t, pats) == [])
+        write(os.path.join(pkg_t, "a.js"), "label('Premiere')")
+        expect("termes (page) : 1 terme planté dans le chargeur, trouvé", terms_in_page(pkg_t, pats) == [("a.js", ["Premiere"])])
         expect("stockage : persistence d'eframe plantée, trouvée",
                storage_findings(clean.replace('"wgpu"', '"wgpu", "persistence"'), clean_ws) == ["eframe:persistence (crate web)"])
     ok = all(results)
@@ -595,6 +728,8 @@ def main(argv):
         "links": (2, lambda a: cmd_links(a[0], a[1])),
         "storage-guard": (3, lambda a: cmd_storage_guard(a[0], a[1], a[2])),
         "terms": (3, lambda a: cmd_terms(a[0], a[1], a[2], strict)),
+        "terms-ui": (4, lambda a: cmd_terms_ui(a[0], a[1], a[2], a[3])),
+        "terms-page": (3, lambda a: cmd_terms_page(a[0], a[1], a[2])),
         "emojis": (2, lambda a: cmd_emojis(a[0], a[1], strict)),
         "sizes": (2, lambda a: cmd_sizes(a[0], a[1])),
         "compress": (1, lambda a: cmd_compress(a[0])),
