@@ -76,6 +76,10 @@ fn arrow(pen: &Pen, hollow: bool) {
 
 /// Paint icon `name` into `r`.
 pub fn paint(p: &Painter, r: Rect, name: &str, c: Color32) {
+    // Evora build (EVORA-CIC-22): Evora's pictograms first (`evora::icons`).
+    if crate::evora::icons::paint(p, r, name, c) {
+        return;
+    }
     let mut pen = Pen { p, r, c, w: 1.3 };
     match name {
         "tool-selection" => arrow(&pen, false),

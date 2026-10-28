@@ -84,6 +84,20 @@ list (author, source, license) is in ASSETS.md.
   (Apache-2.0 OR MIT) are fetched from the pinned craft-libs source documented below.
   hayro-interpret embeds PDFium's Foxit standard-14 fonts under PDFium's BSD-style license
   (vendor/hayro-interpret/assets/LICENSE_FOXIT) and a CMYK profile under CC0-1.0.
+- Pictograms of the Evora build (crates/ui-egui/src/evora/icons.rs): outline paths of the pictogram
+  catalogue of Evora, Heroicons, flattened to polylines; six are composed from those strokes and one
+  is mirrored. MIT License, Copyright (c) 2020 Refactoring UI Inc.: Permission is hereby granted,
+  free of charge, to any person obtaining a copy of this software and associated documentation
+  files (the "Software"), to deal in the Software without restriction, including without
+  limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
+  to the following conditions: The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS",
+  WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+  ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
+  THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 Rust dependencies (vello_cpu, kurbo, skrifa, harfrust, image, egui, eframe, …) are permissively
 licensed (MIT/Apache-2.0/BSD/ISC/Zlib), fetched through crates.io or the pinned source below.

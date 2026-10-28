@@ -4,11 +4,14 @@
 //!
 //! - `workspaces`: Evora's workspaces (CIC-12);
 //! - `keys`: Evora's default shortcuts, which replace every upstream default (CIC-13);
-//! - `menus`: Evora's order of the menus, and the items the Evora build drops (CIC-22).
+//! - `menus`: Evora's order of the menus, and the items the Evora build drops (CIC-22);
+//! - `icons`: Evora's pictograms, drawn in place of the upstream ones the audit gave an outline
+//!   equivalent (CIC-22).
 //!
 //! The theme (CIC-02) lives in `theme.rs`; the display override catalogue and Evora's own strings
 //! (CIC-11, CIC-19) in `i18n/evora/`.
 
+pub mod icons;
 pub mod keys;
 pub mod menus;
 pub mod workspaces;

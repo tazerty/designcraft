@@ -255,7 +255,7 @@ fn wasm_memory_bytes() -> f64 {
 
 /// `diag.ui` (EVORA-CIC-02, CIC-12, CIC-13, CIC-22): the interface Evora designed, as the engine holds
 /// it: brightness and theme tokens, workspaces, the menus in order (and the dropped items left), the
-/// shortcuts in effect, the current tool.
+/// shortcuts in effect, the current tool, and the names Evora supplies a drawing for (`evora::icons`).
 pub fn diag_ui(app: &DesignApp) -> Value {
     use designcraft_ui_egui::theme::{Brightness, Tokens};
     let t = Tokens::for_brightness(app.ui.brightness);
@@ -282,6 +282,7 @@ pub fn diag_ui(app: &DesignApp) -> Value {
         "droppedItems": dropped,
         "shortcuts": menus::effective_shortcuts(app),
         "tool": app.session.tool_id(),
+        "icons": designcraft_ui_egui::evora::icons::names(),
     })
 }
 
