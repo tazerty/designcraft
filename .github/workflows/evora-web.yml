@@ -10,8 +10,11 @@
 #     épinglées par SHA de commit complet ; aucun secret ; jeton en lecture seule ;
 #   - Rust installé par rustup, version épinglée (celle du job « Web (wasm) » de la release amont v0.9.0,
 #     run 39087507233 : rustc 1.99.1, trunk 0.21.14, wasm-opt version_123) ;
-#   - Trunk, wasm-bindgen, wasm-opt, cargo-deny et cargo-about : binaires de release à version épinglée,
-#     vérifiés par SHA-256 avant usage ; Trunk tourne hors ligne et ne peut pas modifier Cargo.lock ;
+#   - Trunk, wasm-bindgen, wasm-opt et cargo-deny : binaires de release à version épinglée, vérifiés par
+#     SHA-256 avant usage ; Trunk tourne hors ligne et ne peut pas modifier Cargo.lock ;
+#   - cargo-about : bâti par cargo install --locked au commit épinglé CARGO_ABOUT_REV (EVORA-CIC-00-b) ;
+#     la release 0.9.2 panique sur ce graphe (manifeste à texte non ASCII sans licence littérale) et ne
+#     sert plus que de témoin rouge ; retour au binaire de release dès qu'une release porte le correctif ;
 #   - runner ubuntu-24.04 sur les deux jobs (le libellé ubuntu-latest change le 2026-10-19) ;
 #   - portes écrites par Evora (.github/evora/, Python de la bibliothèque standard).
 #
@@ -59,7 +62,14 @@ env:
   CARGO_DENY_VERSION: "0.20.2"
   CARGO_DENY_SHA256: "9f12ed4c49936e09b48bf862b595cde2fe64fcbd9d74dfacac6131ca824c8d5f"
   CARGO_ABOUT_VERSION: "0.9.2"
+  # Binaire de release 0.9.2 : témoin rouge seulement (sa synthèse de manifeste insère à un index relatif
+  # et panique sur « is_char_boundary » dès qu'un caractère multi-octet tombe à cet index ; c'est le cas
+  # de crates/tools/Cargo.toml au tag v0.9.0).
   CARGO_ABOUT_SHA256: "9099a59e820c38a68b9d65f300662a567d56562f9a10f6aa4c7e86c17c2566af"
+  # cargo-about utilisé par la porte : commit de la branche principale d'EmbarkStudios/cargo-about du
+  # 2026-09-18 qui porte les deux correctifs de synthesize_manifest (index rebasé, guillemet fermant) ;
+  # le Cargo.toml de ce commit annonce encore 0.9.2. Aucune release ne les porte au 2026-10-19.
+  CARGO_ABOUT_REV: "d7c169da07c684c5a80f75aab8a1dd7df660bc4b"
   # craft-fonts : commit passé par l'amont lui-même (release.yml au tag, ligne craft-fonts-ref).
   CRAFT_FONTS_REF: "abb83316d96aa59c1cf64784289e378fe9fa5695"
   # Slug de build Evora de cette application (D-P18 a) ; consigné dans EVORA-BUILD.txt.
@@ -90,11 +100,11 @@ jobs:
             *) echo "::error::rustc n'est pas $RUST_TOOLCHAIN : $(rustc -V)"; exit 1 ;;
           esac
 
-      - name: cargo-deny et cargo-about (binaires de release vérifiés par SHA-256)
+      - name: cargo-deny et release de cargo-about (binaires de release vérifiés par SHA-256)
         run: |
           set -euo pipefail
           TOOLS="$RUNNER_TEMP/evora-tools"
-          mkdir -p "$TOOLS/bin" "$TOOLS/dl/deny" "$TOOLS/dl/about"
+          mkdir -p "$TOOLS/bin" "$TOOLS/witness" "$TOOLS/dl/deny" "$TOOLS/dl/about"
           fetch() { # url sha256 fichier
             curl --proto '=https' --tlsv1.2 -fsSL --retry 3 -o "$TOOLS/dl/$3" "$1"
             echo "$2  $TOOLS/dl/$3" | sha256sum -c -
@@ -106,10 +116,96 @@ jobs:
           tar -xzf "$TOOLS/dl/deny.tar.gz" -C "$TOOLS/dl/deny"
           tar -xzf "$TOOLS/dl/about.tar.gz" -C "$TOOLS/dl/about"
           install -m 0755 "$(find "$TOOLS/dl/deny" -type f -name cargo-deny -print -quit)" "$TOOLS/bin/cargo-deny"
-          install -m 0755 "$(find "$TOOLS/dl/about" -type f -name cargo-about -print -quit)" "$TOOLS/bin/cargo-about"
+          # Hors du PATH : ce binaire ne sert qu'au témoin rouge de la porte cargo-about.
+          install -m 0755 "$(find "$TOOLS/dl/about" -type f -name cargo-about -print -quit)" "$TOOLS/witness/cargo-about-release"
           echo "$TOOLS/bin" >> "$GITHUB_PATH"
           "$TOOLS/bin/cargo-deny" --version | grep -q " ${CARGO_DENY_VERSION}\$" || { echo "::error::version de cargo-deny inattendue"; exit 1; }
-          "$TOOLS/bin/cargo-about" --version | grep -q " ${CARGO_ABOUT_VERSION}\$" || { echo "::error::version de cargo-about inattendue"; exit 1; }
+          "$TOOLS/witness/cargo-about-release" --version | grep -q " ${CARGO_ABOUT_VERSION}\$" || { echo "::error::version de la release de cargo-about inattendue"; exit 1; }
+
+      - name: Cache de cargo-about bâti (lecture)
+        id: about_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.evora-cargo-about
+          key: evora-cargo-about-${{ runner.os }}-rust${{ env.RUST_TOOLCHAIN }}-${{ env.CARGO_ABOUT_REV }}-cli-nolto
+
+      - name: cargo-about bâti au commit épinglé (cargo install --locked)
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "false"
+        run: |
+          set -euo pipefail
+          root="$HOME/.evora-cargo-about"
+          if [ ! -x "$root/bin/cargo-about" ]; then
+            # Hors de l'espace de travail amont : aucune configuration cargo du dépôt ne s'applique.
+            (cd "$RUNNER_TEMP" && cargo install cargo-about --git https://github.com/EmbarkStudios/cargo-about \
+              --rev "$CARGO_ABOUT_REV" --locked --features cli --root "$root")
+          fi
+          # Le registre de cargo install nomme la source exacte : version annoncée et commit résolu.
+          ver_re="$(printf '%s' "$CARGO_ABOUT_VERSION" | sed 's/[.]/[.]/g')"
+          if ! grep -qE "^\"cargo-about ${ver_re} [(]git[+]https://github[.]com/EmbarkStudios/cargo-about[^#\"]*#${CARGO_ABOUT_REV}[)]\"" "$root/.crates.toml"; then
+            cat "$root/.crates.toml"; echo "::error::cargo-about installé ne vient pas du commit $CARGO_ABOUT_REV"; exit 1
+          fi
+          install -m 0755 "$root/bin/cargo-about" "$RUNNER_TEMP/evora-tools/bin/cargo-about"
+          "$RUNNER_TEMP/evora-tools/bin/cargo-about" --version | grep -q " ${CARGO_ABOUT_VERSION}\$" || { echo "::error::version de cargo-about inattendue"; exit 1; }
+          echo "cargo-about : commit $CARGO_ABOUT_REV ($(grep -F 'cargo-about ' "$root/.crates.toml"))"
+
+      - name: Cache de cargo-about bâti (écriture)
+        if: steps.about_cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.evora-cargo-about
+          key: ${{ steps.about_cache.outputs.cache-primary-key }}
+
+      # Témoin : une crate dont le manifeste hérite sa licence de l'espace de travail et porte un caractère
+      # multi-octet à l'index où la release 0.9.2 insère la licence synthétisée (même forme que
+      # crates/tools/Cargo.toml au tag). La release doit y paniquer, et seulement là ; le binaire épinglé
+      # doit passer. Sinon le témoin ne prouve rien et le job rougit.
+      - name: Témoin de la porte cargo-about (release 0.9.2 rouge, commit épinglé vert)
+        run: |
+          set -euo pipefail
+          w="$RUNNER_TEMP/evora-about-temoin"
+          python3 -I - "$w" <<'PY'
+          import os, sys
+          w = sys.argv[1]
+          files = {
+              "Cargo.toml": '[workspace]\nmembers = ["racine", "outil"]\nresolver = "2"\n\n'
+                            '[workspace.package]\nlicense = "MIT"\n',
+              "racine/Cargo.toml": '[package]\nname = "evora-temoin-racine"\nversion = "0.1.0"\nedition = "2021"\n'
+                                   'license.workspace = true\npublish = false\n\n[dependencies]\n'
+                                   'evora-temoin-outil = { path = "../outil" }\n',
+              "outil/Cargo.toml": '[package]\nname = "evora-temoin-outil"\nversion = "0.1.0"\nedition = "2021"\n'
+                                  'license.workspace = true\n'
+                                  'description = "Temoin Evora de cargo-about (Zoom\u2026)"\n\n[dependencies]\n',
+              "racine/src/lib.rs": "",
+              "outil/src/lib.rs": "",
+              "about.toml": 'accepted = ["MIT"]\n',
+              "about.hbs": "{{#each licenses}}{{id}}\n{{/each}}",
+          }
+          for rel, text in files.items():
+              path = os.path.join(w, rel)
+              os.makedirs(os.path.dirname(path), exist_ok=True)
+              with open(path, "w", encoding="utf-8") as fh:
+                  fh.write(text)
+          # L'index d'insertion de la release : relatif à « [package] » + 5, appliqué au fichier entier.
+          data = open(os.path.join(w, "outil/Cargo.toml"), "rb").read()
+          blank = data.index(b"\n\n") + 1  # début de la première ligne vide
+          idx = blank - (data.index(b"[package]") + 5)
+          if b"MIT" in data or (data[idx] & 0xC0) != 0x80:
+              sys.exit("témoin mal formé : l'index de la release ne tombe pas dans un caractère multi-octet")
+          PY
+          run() { "$1" generate --manifest-path "$w/racine/Cargo.toml" -c "$w/about.toml" -o "$w/$2.txt" "$w/about.hbs" > "$w/$2.log" 2>&1; }
+          rc=0; run "$RUNNER_TEMP/evora-tools/witness/cargo-about-release" release || rc=$?
+          if [ "$rc" = 101 ] && grep -q 'src/licenses/resolution.rs' "$w/release.log" && grep -q 'is_char_boundary' "$w/release.log"; then
+            echo "Témoin rouge OK : la release $CARGO_ABOUT_VERSION panique sur le manifeste témoin (code $rc)"
+          else
+            cat "$w/release.log"; echo "::error::témoin cargo-about : la release ne panique pas comme attendu (code $rc), le témoin ne prouve rien"; exit 1
+          fi
+          rc=0; run "$RUNNER_TEMP/evora-tools/bin/cargo-about" epingle || rc=$?
+          if [ "$rc" = 0 ] && grep -qx 'MIT' "$w/epingle.txt"; then
+            echo "Témoin vert OK : le commit $CARGO_ABOUT_REV passe le même manifeste"
+          else
+            cat "$w/epingle.log"; echo "::error::témoin cargo-about : le binaire épinglé échoue sur le manifeste témoin (code $rc)"; exit 1
+          fi
 
       - name: Sources git du verrou (liste exacte des révisions ; bloquante)
         run: python3 -I .github/evora/gates.py lock-sources Cargo.lock .github/evora/git-sources.txt "$GITHUB_STEP_SUMMARY"
