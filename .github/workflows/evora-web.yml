@@ -2,14 +2,14 @@
 #
 # Écrit par Evora (patch EVORA-CIC-00) à partir de packaging/web/package.sh et packaging/env.sh de
 # l'amont storytold/designcraft (MIT OR Apache-2.0). Rien n'est repris de storytold/craft-common-actions.
-# Les cinq workflows amont (freebsd, nix, packaging-lint, release, windows-arm64) sont retirés de cette
-# branche ; seul ce workflow y vit.
+# Les workflows amont (freebsd, nix, packaging-lint, release, windows-arm64, et depuis v0.13.0 ci et
+# sonarcloud) sont retirés de cette branche ; seul ce workflow y vit.
 #
 # Règles :
 #   - seules actions : actions/checkout, actions/cache, actions/upload-artifact, actions/download-artifact,
 #     épinglées par SHA de commit complet ; aucun secret ; jeton en lecture seule ;
-#   - Rust installé par rustup, version épinglée (celle du job « Web (wasm) » de la release amont v0.9.0,
-#     run 39087507233 : rustc 1.99.1, trunk 0.21.14, wasm-opt version_123) ;
+#   - Rust installé par rustup, version épinglée (celle du job « Web (wasm) » de la release amont v0.13.0,
+#     run 40195914881 : rustc 1.99.1, trunk 0.21.14, wasm-opt version_123 ; v0.9.0 : run 39087507233) ;
 #   - Trunk, wasm-bindgen, wasm-opt et cargo-deny : binaires de release à version épinglée, vérifiés par
 #     SHA-256 avant usage ; Trunk tourne hors ligne et ne peut pas modifier Cargo.lock ;
 #   - cargo-about : bâti par cargo install --locked au commit épinglé CARGO_ABOUT_REV (EVORA-CIC-00-b) ;
@@ -70,8 +70,9 @@ env:
   # 2026-09-18 qui porte les deux correctifs de synthesize_manifest (index rebasé, guillemet fermant) ;
   # le Cargo.toml de ce commit annonce encore 0.9.2. Aucune release ne les porte au 2026-10-19.
   CARGO_ABOUT_REV: "d7c169da07c684c5a80f75aab8a1dd7df660bc4b"
-  # craft-fonts : commit passé par l'amont lui-même (release.yml au tag, ligne craft-fonts-ref).
-  CRAFT_FONTS_REF: "abb83316d96aa59c1cf64784289e378fe9fa5695"
+  # craft-fonts : commit passé par l'amont lui-même (release.yml au tag, ligne craft-fonts-ref ;
+  # a71c20e3 à v0.13.0, abb83316 à v0.9.0).
+  CRAFT_FONTS_REF: "a71c20e30af613287c504f7e685ca8fad77752bc"
   # Slug de build Evora de cette application (D-P18 a) ; consigné dans EVORA-BUILD.txt.
   EVORA_BUILD_SLUG: "layout"
   WEB_MANIFEST: "apps/designcraft-web/Cargo.toml"

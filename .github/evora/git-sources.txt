@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MIT
 # Evora (patch EVORA-CIC-00) : sources git admises dans Cargo.lock, EXACTEMENT (dépôt, spécification et
 # révision). Lues par « gates.py lock-sources » ; une source de plus, de moins ou une autre révision fait
-# échouer la porte. Relevé au tag v0.9.0 (7cb8b12507def48fb9346e5004340b5e8e4cfcb7), à refaire à chaque montée.
+# échouer la porte. Relevé au tag v0.13.0 (dcce40fb8731213c1f8e31cdd23444995afc62ce, EVORA-CIC-00-c), à refaire à chaque montée.
 # indd-utils est déclarée sur « branch = main » par l'amont : seule la révision verrouillée ci-dessous passe.
-git+https://github.com/skylartaylor/winit.git?rev=3d51077fd1a966f84df9ef287839dc84fd5b4ca7#3d51077fd1a966f84df9ef287839dc84fd5b4ca7
+# Depuis v0.13.0 : hayro vient de craft-libs (storytold/pdfcraft n'est plus une source) et le correctif winit de storytold/winit.
 git+https://github.com/storytold/craft-libs?rev=5c874d51eeb3de70e735c8ce87a59a7dedd47675#5c874d51eeb3de70e735c8ce87a59a7dedd47675
 git+https://github.com/storytold/craft-libs?rev=82a24b006eefa036b43c09a67fb9a3fbd17ffe63#82a24b006eefa036b43c09a67fb9a3fbd17ffe63
-git+https://github.com/storytold/craft-libs?rev=c3487320b2d1de657b860b3c8abb44e1f2b32bd8#c3487320b2d1de657b860b3c8abb44e1f2b32bd8
+git+https://github.com/storytold/craft-libs?rev=9f75d3dc19b4b514c4f3d4847ed1ec1b0e86b4ef#9f75d3dc19b4b514c4f3d4847ed1ec1b0e86b4ef
 git+https://github.com/storytold/craft-libs?rev=d991bf6792f8ade99c51358bf3c1d902c8cd96b5#d991bf6792f8ade99c51358bf3c1d902c8cd96b5
 git+https://github.com/storytold/craft-libs?rev=e9546e191dd62f2bc1d61eca45dbdc2f1b3c1d8e#e9546e191dd62f2bc1d61eca45dbdc2f1b3c1d8e
 git+https://github.com/storytold/indd-utils?branch=main#7f3060e5bce78d21ea70e0d5eacb96edce15dfbe
-git+https://github.com/storytold/pdfcraft?rev=b5467d93a0ffaa5e5e6658bccdf8655a3ba689c9#b5467d93a0ffaa5e5e6658bccdf8655a3ba689c9
+git+https://github.com/storytold/winit.git?rev=3d51077fd1a966f84df9ef287839dc84fd5b4ca7#3d51077fd1a966f84df9ef287839dc84fd5b4ca7

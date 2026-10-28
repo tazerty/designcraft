@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Evora (patch EVORA-CIC-00) : configuration de cargo-deny pour l'artefact web, c'est-à-dire le graphe
 # de la crate apps/designcraft-web pour la cible du navigateur, sans les dépendances de développement.
-# L'amont n'a pas de deny.toml au tag v0.9.0. Lancé par .github/workflows/evora-web.yml :
+# L'amont n'a pas de deny.toml au tag v0.9.0 ni au tag v0.13.0. Lancé par .github/workflows/evora-web.yml :
 #   cargo deny --manifest-path apps/designcraft-web/Cargo.toml --config .github/evora/deny.toml \
 #     --locked check advisories bans licenses sources
 # Rien n'est relâché en silence : chaque licence admise, chaque avis ignoré et chaque source git est
@@ -71,22 +71,24 @@ wildcards = "allow"
 highlight = "all"
 
 [sources]
-# crates.io et les quatre dépôts git de l'amont, chacun verrouillé à une révision dans Cargo.lock
+# crates.io et les dépôts git de l'amont, chacun verrouillé à une révision dans Cargo.lock
 # (la porte « sources du verrou » de la CI exige la liste EXACTE des révisions, .github/evora/git-sources.txt) :
 #   storytold/craft-libs  : cinq révisions (craft-pdf, krilla, craft-docpath, craft-atomic, craft-cms,
 #                           craft-print, craft-ui), Apache-2.0 selon le dépôt, « MIT OR Apache-2.0 » par crate ;
 #   storytold/pdfcraft    : hayro, hayro-interpret, hayro-syntax, hayro-jbig2 (lecture des PDF) ;
 #   storytold/indd-utils  : crate indd, déclarée sur « branch = main » par l'amont, admise ici à la
 #                           seule révision du verrou (7f3060e5) ; INDD reste hors V1 (D-16, CIC-15) ;
-#   skylartaylor/winit    : correctif tiers de winit 0.30.13 ([patch.crates-io] de l'amont) ; sans
-#                           doute hors du graphe wasm (backend web d'eframe) : avertissement s'il n'est pas vu.
+#   storytold/winit       : correctif de winit 0.30.13 ([patch.crates-io] de l'amont ; tiré de
+#                           skylartaylor/winit jusqu'à v0.9.0, de storytold/winit depuis, même révision) ;
+#                           sans doute hors du graphe wasm (backend web d'eframe) : avertissement s'il n'est pas vu.
+# Au tag v0.13.0 (EVORA-CIC-00-c), hayro (lecture des PDF) vient de craft-libs : storytold/pdfcraft
+# n'est plus une source du verrou et n'est plus admise.
 # Toute autre source fait échouer la porte ; le témoin de la CI retire indd-utils et exige ce rouge.
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
     "https://github.com/storytold/craft-libs",
-    "https://github.com/storytold/pdfcraft",
     "https://github.com/storytold/indd-utils",
-    "https://github.com/skylartaylor/winit",
+    "https://github.com/storytold/winit",
 ]
