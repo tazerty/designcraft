@@ -325,7 +325,7 @@ fn write_links(d: &Document, root: &OutputRoot, dir: &Path, only: Option<&[Asset
 /// report adds after the font's name (nothing when copied).
 fn copy_font(root: &OutputRoot, face: &FontFace, dir: &Path, copied: &mut Vec<PathBuf>, taken: &mut Vec<String>, files: &mut Vec<PathBuf>) -> String {
     let from = match &face.source {
-        FontSource::Bundled => return " — included with DesignCraft".into(),
+        FontSource::Bundled => return " — included with Cicero".into(),
         FontSource::Memory => return " — not copied: no font file".into(),
         FontSource::Installed(p) | FontSource::Document(p) => p,
     };
@@ -438,7 +438,7 @@ fn package(s: &mut Session, p: &Value) -> Result<Value> {
         root.write(&path, &designcraft_idml::export_idml_with(&packed, &opts))?;
         files.push(path);
         if super::interchange::has_applicable_pdf_layer_overrides(&packed) {
-            idml_layer_note = "\nPlaced PDF layers\nThe IDML copy links the placed PDFs, so it shows their file defaults. The DesignCraft document keeps each placement's Object Layer Options choice.\n";
+            idml_layer_note = "\nPlaced PDF layers\nThe IDML copy links the placed PDFs, so it shows their file defaults. The Cicero document keeps each placement's Object Layer Options choice.\n";
         }
     }
     if p.get("pdf").and_then(Value::as_bool).unwrap_or(false) {
@@ -725,7 +725,7 @@ mod tests {
         let report = r["report"].as_str().unwrap();
         assert!(report.contains(&format!("{RESTRICTED} Regular — not copied: its licence doesn't allow it")), "{report}");
         assert!(report.contains(&format!("{FREE} Regular\n")), "{report}");
-        assert!(report.contains(&format!("{} Regular — included with DesignCraft", designcraft_fonts::DEFAULT_FAMILY)), "{report}");
+        assert!(report.contains(&format!("{} Regular — included with Cicero", designcraft_fonts::DEFAULT_FAMILY)), "{report}");
         // The packaged document opens with its fonts.
         let doc = r["files"][0].as_str().unwrap().to_string();
         assert_eq!(Session::new().execute("file.open", &json!({"path": doc})).unwrap()["documentFonts"], 1);

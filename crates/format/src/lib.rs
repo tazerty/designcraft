@@ -30,9 +30,9 @@ pub const VERSION: u32 = 4;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FormatError {
-    #[error("not a DesignCraft document: {0}")]
+    #[error("not a Cicero document: {0}")]
     NotOurs(String),
-    #[error("document is from a newer DesignCraft (format {0}); please update")]
+    #[error("document is from a newer Cicero (format {0}); please update")]
     TooNew(u64),
     #[error("{0}")]
     Io(String),

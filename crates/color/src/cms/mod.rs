@@ -35,7 +35,10 @@ pub const PROPHOTO_RGB: &str = "ProPhoto RGB";
 /// CMYK working space.
 pub const COATED_FOGRA39: &str = craft_cms::builtin::COATED_FOGRA39_DESCRIPTION;
 /// Our parametric press model (see [`generic`]). Not an Adobe/ECI profile.
-pub const GENERIC_CMYK: &str = "DesignCraft Generic CMYK (SWOP-like)";
+pub const GENERIC_CMYK: &str = "Cicero Generic CMYK (SWOP-like)";
+/// What follows the build's name in [`GENERIC_CMYK`]: a document or preference saved by another
+/// build names the same parametric model after that build, and still means this model.
+const GENERIC_CMYK_SUFFIX: &str = " Generic CMYK (SWOP-like)";
 /// Profile-free CMYK (`rgb = (1−c)(1−k)` …): uncalibrated, kept for legacy numbers.
 pub const DEVICE_CMYK: &str = "Device CMYK (uncalibrated)";
 
@@ -229,6 +232,8 @@ fn cmyk_space(name: &str) -> Result<CmykSpace, CmsError> {
             Some(_) => Err(CmsError::Unsupported(format!("{name} is not a CMYK profile"))),
             // Names of the profiles the built-in stands in for (Coated FOGRA39 (ISO 12647-2:2004), ISO Coated v2 (ECI) …).
             None if craft_cms::Builtin::stand_in_for(name) == Some(craft_cms::Builtin::CoatedFogra39) => Ok(default_cmyk()),
+            // The generic model under the name another build gave it (see `GENERIC_CMYK_SUFFIX`).
+            None if name.ends_with(GENERIC_CMYK_SUFFIX) => Ok(CmykSpace::Generic(generic())),
             None => Err(CmsError::UnknownProfile(name.into())),
         },
     }
