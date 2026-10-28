@@ -15,6 +15,8 @@ pub mod cursors;
 pub mod dialogs;
 pub mod dock;
 pub mod effects_dialog;
+// Evora build (EVORA-CIC-12, CIC-13, CIC-22): Evora's workspaces, shortcuts and menu order.
+pub mod evora;
 pub mod i18n;
 pub mod icons;
 pub mod menus;
@@ -436,7 +438,7 @@ impl Default for UiState {
             dock_expanded: true,
             icon_groups: None,
             units: Unit::Picas,
-            workspace: "Essentials".into(),
+            workspace: crate::evora::workspaces::DEFAULT.into(),
             custom_workspaces: Vec::new(),
             recent_new_documents: Vec::new(),
             last_save_folder: None,

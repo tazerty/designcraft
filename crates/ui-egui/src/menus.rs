@@ -964,9 +964,8 @@ pub const MENUS: &[(&str, &[&str])] = &[
     ),
 ];
 
-/// The built-in workspaces, in InDesign's order.
-pub const WORKSPACES: &[&str] =
-    &["Advanced", "Book", "Digital Publishing", "Essentials", "Essentials Classic", "Interactive for PDF", "Printing and Proofing", "Typography"];
+/// The built-in workspaces: Evora's (EVORA-CIC-12), in the order of the work.
+pub const WORKSPACES: &[&str] = crate::evora::workspaces::NAMES;
 
 /// Essentials Classic's icon column: InDesign's iconic panel groups, top to bottom.
 pub const CLASSIC_GROUPS: &[&[&str]] = &[
@@ -1945,7 +1944,7 @@ fn run_ui_inner(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
                 return Some(Err(format!("no saved workspace `{name}`")));
             }
             if app.ui.workspace == name {
-                app.ui.workspace = "Essentials".into();
+                app.ui.workspace = crate::evora::workspaces::DEFAULT.into();
             }
             Ok(Value::Null)
         }
@@ -1957,7 +1956,7 @@ fn run_ui_inner(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
             app.ui.docking_generation = app.ui.docking_generation.wrapping_add(1);
             app.ui.docking_raise = None;
             app.ui.docking_opened = None;
-            let name = p.get("name").and_then(Value::as_str).unwrap_or("Essentials");
+            let name = p.get("name").and_then(Value::as_str).unwrap_or(crate::evora::workspaces::DEFAULT);
             if let Some(w) = app.ui.custom_workspaces.iter().find(|w| w.name == name).cloned() {
                 if let Some(hidden) = w.hidden_menu_items {
                     app.ui.hidden_menu_items = hidden;
@@ -1978,6 +1977,10 @@ fn run_ui_inner(app: &mut DesignApp, id: &str, p: &Value) -> Option<Result<Value
                 app.ui.docking_hidden = w.docking_hidden;
                 app.ui.icon_groups = w.icon_groups;
                 app.ui.workspace = w.name;
+                return Some(Ok(Value::Null));
+            }
+            // Evora (EVORA-CIC-12): Evora's built-in workspaces, laid out by function.
+            if crate::evora::workspaces::apply(app, name) {
                 return Some(Ok(Value::Null));
             }
             // Workspaces choose which bars and panels are visible.

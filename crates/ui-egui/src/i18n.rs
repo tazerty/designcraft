@@ -4821,17 +4821,8 @@ pub fn style_name<'a>(lang: &str, name: &'a str) -> &'a str {
 
 /// Built-in workspace captions; custom workspace names remain unchanged.
 pub fn workspace_name<'a>(lang: &str, name: &'a str) -> &'a str {
-    match name {
-        "Essentials"
-        | "Essentials Classic"
-        | "Advanced"
-        | "Book"
-        | "Digital Publishing"
-        | "Interactive for PDF"
-        | "Printing and Proofing"
-        | "Typography" => tr(lang, name),
-        _ => name,
-    }
+    // Evora (EVORA-CIC-12): Evora's built-in workspaces.
+    if crate::evora::workspaces::NAMES.contains(&name) { tr(lang, name) } else { name }
 }
 
 #[cfg(test)]
