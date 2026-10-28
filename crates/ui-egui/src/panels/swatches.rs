@@ -99,7 +99,7 @@ pub fn show(app: &mut DesignApp, ui: &mut egui::Ui) {
             if folder_button(ui, crate::i18n::tr(&app.ui.language, "New Color Group")).clicked() {
                 let _ = app.run("swatch.newColorGroup", json!({}));
             }
-            crate::menus::menu_button(ui, "☰", |ui| {
+            crate::menus::menu_button(ui, "≡", |ui| {
                 let current = fill_cur.as_deref().filter(|n| doc.swatch(n).is_some_and(|w| !w.hidden));
                 if ui
                     .add_enabled(current.is_some(), egui::Button::new(crate::rtl::widget(ui, crate::i18n::tr(&app.ui.language, "Swatch Options…"))))

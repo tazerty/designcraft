@@ -433,7 +433,7 @@ fn fill_stroke_proxy(app: &mut DesignApp, ui: &mut egui::Ui, width: f32, cols: u
                 let on = crate::menus::checked(app, id, &Value::Null).unwrap_or(false);
                 let label = VIEW_OPTIONS[k];
                 let sc = crate::menus::ui_label(id).and_then(|c| c.1).unwrap_or("");
-                let text = format!("{}  {}", if on { "✓" } else { "   " }, crate::i18n::tr(&app.ui.language, label));
+                let text = format!("{}  {}", if on { "•" } else { "   " }, crate::i18n::tr(&app.ui.language, label));
                 if ui.add(egui::Button::new(crate::rtl::widget(ui, &text)).shortcut_text(sc)).clicked() {
                     let _ = app.run(id, json!({}));
                     ui.close();

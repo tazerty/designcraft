@@ -1965,7 +1965,7 @@ pub fn paragraph_panel(app: &mut DesignApp, ui: &mut egui::Ui) {
         }
         x += pitch;
     }
-    place(ui, sub(b, fw - 20.0, 0.0, 20.0, 21.0), |ui| crate::menus::menu_button(ui, "☰", |ui| paragraph_panel_menu(app, ui, &p)));
+    place(ui, sub(b, fw - 20.0, 0.0, 20.0, 21.0), |ui| crate::menus::menu_button(ui, "≡", |ui| paragraph_panel_menu(app, ui, &p)));
     ui.add_space(6.0);
     // Indents, spacing and drop cap, two to a row as in InDesign.
     let row = FIELD_H + 5.0;
@@ -2061,7 +2061,7 @@ fn paragraph_panel_menu(app: &mut DesignApp, ui: &mut Ui, p: &Value) {
     let item = |ui: &mut Ui, label: &str, check: Option<bool>, enabled: bool| -> bool {
         let label = crate::i18n::tr(&lang, label);
         let text = match check {
-            Some(true) => format!("✓ {label}"),
+            Some(true) => format!("• {label}"),
             Some(false) => format!("   {label}"),
             None => label.to_string(),
         };
@@ -2608,7 +2608,7 @@ pub fn links_panel(app: &mut DesignApp, ui: &mut egui::Ui) {
                         ui,
                         crate::rtl::widget(
                             ui,
-                            egui::RichText::new(crate::i18n::tr(&app.ui.language, "⚠ out of date")).color(egui::Color32::from_rgb(230, 160, 40)),
+                            egui::RichText::new(crate::i18n::tr(&app.ui.language, "! out of date")).color(egui::Color32::from_rgb(230, 160, 40)),
                         ),
                     );
                     if ui.small_button(crate::rtl::widget(ui, crate::i18n::tr(&app.ui.language, "Update"))).clicked() {
@@ -2985,7 +2985,7 @@ pub fn preflight_panel(app: &mut DesignApp, ui: &mut egui::Ui) {
     divider(ui);
     for i in issues {
         let page = i.page.filter(|_| app.session.active().is_some()).map(|p| app.session.page_label(p));
-        let text = format!("{}  {}", if i.severity == "error" { "⛔" } else { "⚠" }, i.message);
+        let text = format!("{}  {}", if i.severity == "error" { "⊘" } else { "!" }, i.message);
         let resp = ui.add(egui::Button::new(egui::RichText::new(text).size(11.0)).frame(false));
         if let Some(pg) = &page {
             crate::rtl::label(ui, egui::RichText::new(format!("   page {pg}")).size(10.0).color(t.text_dim));
@@ -3448,23 +3448,23 @@ mod tests {
         h.get_by_label("Align to Baseline Grid").click();
         h.run_steps(3);
         assert_eq!(text_attrs(h.state_mut()).unwrap()["para"]["gridAlign"], "firstLineOnly");
-        h.get_by_label("☰").click();
+        h.get_by_label("≡").click();
         h.run_steps(3);
-        let _ = h.get_by_label("✓ Only Align First Line to Grid");
+        let _ = h.get_by_label("• Only Align First Line to Grid");
     }
 
     #[test]
     fn paragraph_panel_menu_toggles_ignore_optical_margin() {
         let mut h = panel_harness(text_app(), paragraph_panel);
         h.run_steps(3);
-        h.get_by_label("☰").click();
+        h.get_by_label("≡").click();
         h.run_steps(3);
         h.get_by_label("   Ignore Optical Margin").click();
         h.run_steps(3);
         assert_eq!(text_attrs(h.state_mut()).unwrap()["para"]["ignoreOpticalMargin"], true);
-        h.get_by_label("☰").click();
+        h.get_by_label("≡").click();
         h.run_steps(3);
-        h.get_by_label("✓ Ignore Optical Margin").click();
+        h.get_by_label("• Ignore Optical Margin").click();
         h.run_steps(3);
         assert_eq!(text_attrs(h.state_mut()).unwrap()["para"]["ignoreOpticalMargin"], false);
     }
@@ -3473,7 +3473,7 @@ mod tests {
     fn paragraph_panel_menu_define_lists_opens_its_dialog() {
         let mut h = panel_harness(text_app(), paragraph_panel);
         h.run_steps(3);
-        h.get_by_label("☰").click();
+        h.get_by_label("≡").click();
         h.run_steps(3);
         h.get_by_label("Define Lists…").click();
         h.run_steps(3);
@@ -3527,7 +3527,7 @@ mod tests {
         h.get_by_label("Align to Baseline Grid").click();
         h.run_steps(3);
         assert_eq!(para(&mut h)["gridAlign"], "allLines");
-        h.get_by_label("☰").click();
+        h.get_by_label("≡").click();
         h.run_steps(3);
         for l in [
             "   Balance Ragged Lines",
@@ -3546,7 +3546,7 @@ mod tests {
         h.run_steps(3);
         assert_eq!(para(&mut h)["gridAlign"], "none");
         // Keep Options… opens the selected paragraphs' Keep Options, and OK applies them.
-        h.get_by_label("☰").click();
+        h.get_by_label("≡").click();
         h.run_steps(3);
         h.get_by_label("Keep Options…").click();
         h.run_steps(3);

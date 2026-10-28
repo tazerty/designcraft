@@ -272,7 +272,7 @@ fn more(app: &mut DesignApp, ui: &mut Ui, at: [f32; 2]) {
         }
         let pinned = app.ui.task_bar_pin.is_some();
         let pin = crate::i18n::tr(&app.ui.language, "Pin Bar Position");
-        if ui.button(crate::rtl::widget(ui, if pinned { format!("✓ {pin}") } else { format!("   {pin}") })).clicked() {
+        if ui.button(crate::rtl::widget(ui, if pinned { format!("• {pin}") } else { format!("   {pin}") })).clicked() {
             let params = if pinned { json!({"on": false}) } else { json!({"on": true, "at": at}) };
             let _ = app.run("window.taskBarPin", params);
             ui.close();

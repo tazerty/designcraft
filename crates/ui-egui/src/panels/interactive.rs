@@ -262,7 +262,7 @@ pub fn tags(app: &mut DesignApp, ui: &mut egui::Ui) {
         }
         Some(list) => {
             for p in list {
-                crate::rtl::label(ui, egui::RichText::new(format!("⚠ {p}")).size(11.0));
+                crate::rtl::label(ui, egui::RichText::new(format!("! {p}")).size(11.0));
             }
         }
         None => {}

@@ -326,10 +326,7 @@ pub fn app_bar(app: &mut DesignApp, ui: &mut egui::Ui) {
                                 app.status(crate::i18n::tr(&app.ui.language, "Export a PDF, IDML or package to share — no cloud account needed."));
                             }
                             ui.add_space(8.0);
-                            // Always one click away: the ArtCraft community Discord.
-                            if crate::about::discord_button(ui, "Discord", vec2(78.0, 22.0)) {
-                                let _ = app.run("help.discord", json!({}));
-                            }
+                            // Evora build (patch EVORA-CIC-05, E7): no community button in the bar.
                             tools_start = ui.min_rect().min.x;
                             ui.data_mut(|d| d.insert_temp(egui::Id::new("app_bar_tools_start"), tools_start));
                             ui.min_rect().width()
@@ -343,8 +340,8 @@ pub fn app_bar(app: &mut DesignApp, ui: &mut egui::Ui) {
             });
             // Centred title.
             let title = match app.session.active() {
-                Some(d) => format!("DesignCraft — {}", crate::rtl::isolate(&d.title())),
-                None => "DesignCraft".to_string(),
+                Some(d) => format!("Cicero — {}", crate::rtl::isolate(&d.title())),
+                None => "Cicero".to_string(),
             };
             // Centred between the menus and the right-hand controls; left out when it won't fit.
             let galley = crate::rtl::plain(ui.ctx(), &title, egui::FontId::proportional(11.5), t.text);
@@ -1215,7 +1212,7 @@ pub fn start_screen(app: &mut DesignApp, ui: &mut egui::Ui) {
             egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
                 ui.label(crate::rtl::widget(
                     ui,
-                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Welcome to DesignCraft")).font(semibold(28.0)).color(t.text_strong),
+                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Welcome to Cicero")).font(semibold(28.0)).color(t.text_strong),
                 ));
                 ui.label(crate::rtl::widget(
                     ui,
@@ -1422,54 +1419,9 @@ fn recent_preview_texture(ctx: &egui::Context, path: &str, modified: Option<std:
 
 /// Start screen: the ArtCraft community (Discord first) and project links.
 fn community_card(app: &mut DesignApp, ui: &mut egui::Ui) {
-    let t = Tokens::get(ui.ctx());
-    egui::Frame::NONE.fill(t.panel).corner_radius(10.0).inner_margin(egui::Margin::same(14)).show(ui, |ui| {
-        // Wide enough for the longer translations of the line under the title, with the button
-        // at the right edge; the text wraps before the button's space rather than run under it.
-        const BUTTON: egui::Vec2 = vec2(190.0, 38.0);
-        ui.set_max_width(760.0);
-        ui.horizontal(|ui| {
-            let (r, _) = ui.allocate_exact_size(vec2(44.0, 44.0), Sense::hover());
-            crate::about::paint_mark(ui, r, crate::about::BRAND);
-            ui.add_space(8.0);
-            let label = crate::i18n::tr(&app.ui.language, "Join our Discord");
-            let button = crate::about::discord_button_size(ui.ctx(), label, BUTTON);
-            let text_width = (ui.available_width() - button.x - 16.0).max(120.0);
-            ui.vertical(|ui| {
-                ui.set_max_width(text_width);
-                ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
-                ui.label(crate::rtl::widget(
-                    ui,
-                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Join the ArtCraft community")).font(semibold(14.0)).color(t.text_strong),
-                ));
-                ui.label(crate::rtl::widget(
-                    ui,
-                    egui::RichText::new(crate::i18n::tr(&app.ui.language, "Get help, share your layouts and shape what we build next."))
-                        .size(12.0)
-                        .color(t.text_dim),
-                ));
-                ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    for (text, id) in [("DesignCraft page", "help.appPage"), ("GitHub", "help.github"), ("getartcraft.com", "help.website")] {
-                        let url = designcraft_engine::links::get(&id[5..]).unwrap_or_default();
-                        let l = ui
-                            .add(egui::Label::new(egui::RichText::new(text).size(12.0).color(t.accent).underline()).sense(Sense::click()))
-                            .on_hover_text(url)
-                            .on_hover_cursor(egui::CursorIcon::PointingHand);
-                        if l.clicked() {
-                            let _ = app.run(id, json!({}));
-                        }
-                        ui.add_space(8.0);
-                    }
-                });
-            });
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if crate::about::discord_button(ui, label, BUTTON) {
-                    let _ = app.run("help.discord", json!({}));
-                }
-            });
-        });
-    });
+    // Evora build (patches EVORA-CIC-01 and EVORA-CIC-05, E1 and E7): the upstream community card
+    // (mark, invitation, outside links) is not shown.
+    let _ = (app, ui);
 }
 
 #[cfg(test)]

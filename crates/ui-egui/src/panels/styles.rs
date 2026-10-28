@@ -80,7 +80,7 @@ fn list(app: &mut DesignApp, ui: &mut egui::Ui, para: bool) {
                 let base = if para { "Paragraph Style 1" } else { "Character Style 1" };
                 let _ = app.run(cmd, json!({"name": base, "fromSelection": true}));
             }
-            crate::menus::menu_button(ui, "☰", |ui| {
+            crate::menus::menu_button(ui, "≡", |ui| {
                 let (label, cmd) = if para {
                     ("Load Paragraph Styles…", "app.loadParagraphStyles")
                 } else {

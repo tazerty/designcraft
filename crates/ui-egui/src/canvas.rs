@@ -2248,7 +2248,7 @@ fn ruler_units_menu(app: &mut DesignApp, ui: &mut egui::Ui, which: RulerMenu, cu
     let extra = cur.filter(|u| !RULER_UNITS.contains(u));
     for u in RULER_UNITS.into_iter().chain(extra) {
         let label = tr(u.label());
-        let text = if Some(u) == cur { format!("✓ {label}") } else { format!("   {label}") };
+        let text = if Some(u) == cur { format!("• {label}") } else { format!("   {label}") };
         if ui.button(crate::rtl::widget(ui, text)).clicked() {
             let p = match which {
                 RulerMenu::Horizontal => json!({"horizontalUnits": u}),
@@ -4661,13 +4661,13 @@ mod tests {
         assert_eq!(units(&h), (Unit::Picas, Unit::Picas));
         // Vertical ruler: the current unit is checked; picking one sets only the vertical units.
         right_click(&mut h, pos2(rect.min.x - RULER / 2.0, rect.center().y));
-        h.get_by_label("✓ Picas");
+        h.get_by_label("• Picas");
         h.get_by_label("   Millimeters").click();
         h.run_steps(3);
         assert_eq!(units(&h), (Unit::Picas, Unit::Millimeters));
         // Horizontal ruler.
         right_click(&mut h, pos2(rect.center().x, rect.min.y - RULER / 2.0));
-        h.get_by_label("✓ Picas");
+        h.get_by_label("• Picas");
         h.get_by_label("   Inches").click();
         h.run_steps(3);
         assert_eq!(units(&h), (Unit::Inches, Unit::Millimeters));
@@ -4675,7 +4675,7 @@ mod tests {
         // they differ.
         let corner = rect.min - vec2(RULER / 2.0, RULER / 2.0);
         right_click(&mut h, corner);
-        assert!(h.query_by_label("✓ Inches").is_none() && h.query_by_label("✓ Millimeters").is_none());
+        assert!(h.query_by_label("• Inches").is_none() && h.query_by_label("• Millimeters").is_none());
         let _ = h.get_by_label_contains("Hide Rulers");
         let _ = h.get_by_label("   Lock Zero Point");
         assert!(h.query_by_label("   Delete All Guides on Spread").is_none(), "only on the horizontal ruler");
@@ -4684,7 +4684,7 @@ mod tests {
         assert_eq!(units(&h), (Unit::Points, Unit::Points));
         // InDesign's list: no Q or Ha.
         right_click(&mut h, corner);
-        h.get_by_label("✓ Points");
+        h.get_by_label("• Points");
         assert!(h.query_by_label("   Q").is_none() && h.query_by_label("   Ha").is_none());
         let _ = h.get_by_label("   Inches Decimal");
         // The horizontal ruler's menu also deletes the spread's guides; Hide Rulers hides them.
@@ -5092,7 +5092,7 @@ mod tests {
         assert_eq!(selected(&h), [a], "a right-click on nothing keeps the selection");
         assert!(menu_row(&h, "Arrange").is_none(), "the page menu, not the object menu");
         assert!(enabled(&h, "Paste in Place"));
-        assert!(menu_row(&h, "✓ Show/Hide Rulers").is_some(), "toggles show their state");
+        assert!(menu_row(&h, "• Show/Hide Rulers").is_some(), "toggles show their state");
         // Escape closes the menu and does nothing else: the tool would deselect, the shortcuts
         // would switch to the Selection tool.
         h.key_press(egui::Key::Escape);

@@ -377,7 +377,7 @@ pub fn show(app: &mut DesignApp, ui: &mut Ui) {
         if ui.add_enabled_ui(screen.is_some(), |ui| crate::icons::button(ui, "tab-snap", 22.0, false, snap_tip)).inner.clicked() {
             snap_now = true;
         }
-        crate::menus::menu_button(ui, "☰", |ui| {
+        crate::menus::menu_button(ui, "≡", |ui| {
             for (label, id, needs_stop) in
                 [("Clear All", "type.tabs.clear", false), ("Delete Tab", "type.tabs.remove", true), ("Repeat Tab", "type.tabs.repeat", true)]
             {
