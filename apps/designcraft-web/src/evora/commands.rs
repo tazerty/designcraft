@@ -92,7 +92,9 @@ fn live_items(app: &DesignApp) -> Vec<(String, Vec<String>, String)> {
                     if !params.is_null() || id.is_empty() || out.iter().any(|(i, _, _)| i == id) {
                         continue;
                     }
-                    if crate::evora::masks::hidden(id) || !menus::shown(app, id) {
+                    // Hidden or refused by the host filter (`masks`): never in the catalogue, whatever
+                    // its namespace (the filter would answer it with nothing, an `ok` that did nothing).
+                    if crate::evora::masks::hidden(id) || crate::evora::masks::refuses(id) || !menus::shown(app, id) {
                         continue;
                     }
                     out.push((id.clone(), path.clone(), label.clone()));
@@ -151,7 +153,7 @@ pub fn in_catalog(app: &DesignApp, command: &str) -> bool {
 /// code of the refusal. `catalog`: `command.catalog` is effective.
 pub fn run(app: &mut DesignApp, command: &str, confirmed: bool, catalog: bool) -> Result<(), &'static str> {
     let known = if catalog { in_catalog(app, command) || ENGINE_COMMANDS.contains(&command) } else { ENGINE_COMMANDS.contains(&command) };
-    if is_diagnostic(command) || !known {
+    if is_diagnostic(command) || !known || crate::evora::masks::refuses(command) {
         return Err("capability");
     }
     if destructive(command) && !confirmed {
