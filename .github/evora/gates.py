@@ -7,12 +7,14 @@
   lock-sources LOCK EXPECTED REPORT
                                  BLOQUANTE : les sources git de Cargo.lock sont EXACTEMENT celles de
                                  EXPECTED (source complète, révision comprise).
-  brands PKG REPORT [--strict]   marques ArtCraft (artcraft, getartcraft, discord.gg) dans le bundle
-                                 (rapport en F0 ; --strict dès EVORA-CIC-01) ; nom amont compté en rapport.
+  brands PKG REPORT [--strict]   marques ArtCraft (artcraft, getartcraft, discord.gg, casse ignorée) ET nom
+                                 amont « DesignCraft » (casse exacte : les crates « designcraft_* » du .wasm
+                                 restent hors champ) dans tout le bundle hors LICENSES/ (rapport en F0 ;
+                                 --strict dès EVORA-CIC-01 pour les marques, dès EVORA-CIC-18-g pour le nom
+                                 amont, couches moteur L0 à L5 comprises : exceptions X-EXP-01 et X-NOM-01).
   brands-ui REPO PKG REPORT      BLOQUANTE (EVORA-CIC-01) : 0 « DesignCraft » dans les chaînes littérales des
-                                 couches d'affichage (L6, L7, hors tests) et dans index.html et le chargeur ;
-                                 le reste du bundle (couches moteur L1 à L5 : messages, profils, métadonnées)
-                                 est mesuré par « brands ».
+                                 couches d'affichage (L6, L7, hors tests) et dans index.html et le chargeur
+                                 (garde à la source, avant la construction du bundle).
   links REPO REPORT              BLOQUANTE (EVORA-CIC-05) : aucune URL http(s) dans les chaînes littérales des
                                  couches d'affichage, hors schéma nu (« https:// », champ de saisie vide).
   storage-guard MANIFEST WORKSPACE REPORT
@@ -220,15 +222,17 @@ def gate_verdict(name, total, strict, rep, scope=f"hors {LICENCES_DIR}/ du bundl
 
 def cmd_brands(pkg, report_path, strict):
     rep = Report(report_path)
-    rep.line("### Marques (" + ("bloquante" if strict else "rapport : E1 n'est pas encore posé") + ")")
+    rep.line("### Marques et nom amont dans le bundle (" + ("bloquante" if strict else "rapport : E1 n'est pas encore posé") + ")")
     rep.line()
     per_file, total = count_in_bundle(pkg, BRANDS, fold=True)
     table(rep, per_file, BRANDS)
     named_files, named = count_in_bundle(pkg, (UPSTREAM_NAME,), fold=False)
     rep.line()
-    rep.line(f"Nom amont `{UPSTREAM_NAME}` (casse exacte) : {named[UPSTREAM_NAME]} occurrence(s) dans "
-             f"{len(named_files)} fichier(s) ; il compte dans la porte à partir d'E1.")
-    status = gate_verdict("marques", total, strict, rep)
+    rep.line(f"Nom amont `{UPSTREAM_NAME}` (casse exacte, hors {LICENCES_DIR}/) : {named[UPSTREAM_NAME]} occurrence(s) dans "
+             f"{len(named_files)} fichier(s) ; il compte dans la porte (EVORA-CIC-18-g).")
+    for r, counts in named_files.items():
+        rep.line(f"- `{r}` : {counts[UPSTREAM_NAME]}")
+    status = gate_verdict("marques", {**total, **named}, strict, rep)
     rep.close()
     return status
 
@@ -518,6 +522,19 @@ def witness():
         expect("termes : « Primary Text Frame » planté, 1 trouvé", terms["Primary Text Frame"] == 1)
         expect("marques --strict : porte rouge", cmd_brands(pkg, None, True) == 1)
         expect("marques en rapport : porte verte malgré l'occurrence", cmd_brands(pkg, None, False) == 0)
+
+        # Nom amont (EVORA-CIC-18-g) : un bundle sans marque, dont seul le nom amont décide.
+        pkg_nom = os.path.join(tmp, "pkg-nom")
+        write(os.path.join(pkg_nom, "index.html"), "<title>Cicero</title>")
+        write(os.path.join(pkg_nom, "c.js"), "import * as designcraft_engine from './x.js'; // Cicero")
+        write(os.path.join(pkg_nom, LICENCES_DIR, "NOTICE"), "Cicero, based on DesignCraft")
+        expect("nom amont : casse exacte (designcraft_*) et LICENSES/ ignorés, porte stricte verte",
+               cmd_brands(pkg_nom, None, True) == 0)
+        with open(os.path.join(pkg_nom, "m.wasm"), "wb") as fh:
+            fh.write(b"\x00asm\x01\x00\x00\x00 producer DesignCraft \x00")
+        _, named = count_in_bundle(pkg_nom, (UPSTREAM_NAME,), fold=False)
+        expect("nom amont : 1 « DesignCraft » planté dans un .wasm, 1 trouvé", named[UPSTREAM_NAME] == 1)
+        expect("nom amont --strict : porte rouge sur le seul nom amont", cmd_brands(pkg_nom, None, True) == 1)
         expect("CSP : une empreinte pour le seul script inline",
                csp_hashes('<script type="module">init()</script><script src="a.js"></script>')
                == ["sha256-" + base64.b64encode(hashlib.sha256(b"init()").digest()).decode()])
