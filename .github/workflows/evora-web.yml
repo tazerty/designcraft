@@ -573,14 +573,16 @@ jobs:
           find "$PKG" -exec touch -h -d "@$EPOCH" {} +
           (cd "$WORK" && find "$NAME" -print | LC_ALL=C sort | zip -X -9 -q -@ "$OUT/$NAME.zip")
           python3 -I .github/evora/gates.py hosting "$PKG" ""
-          (cd "$OUT" && sha256sum "$NAME.zip" csp-hashes.txt > SHA256SUMS)
+          # Catalogue des commandes émis par le moteur pendant la fumée pont-ehp (command.catalog, DT-S17).
+          cp "$GITHUB_WORKSPACE/evora-ci/smoke/commands.json" "$OUT/commands.json"
+          (cd "$OUT" && sha256sum "$NAME.zip" csp-hashes.txt commands.json > SHA256SUMS)
           cat "$OUT/SHA256SUMS"
           {
             echo "### Archive (ligne de base)"
             echo
             echo "| Fichier | Octets | SHA-256 |"
             echo "|---|---|---|"
-            for f in "$NAME.zip" csp-hashes.txt; do
+            for f in "$NAME.zip" csp-hashes.txt commands.json; do
               echo "| \`$f\` | $(stat -c %s "$OUT/$f") | \`$(sha256sum "$OUT/$f" | cut -d' ' -f1)\` |"
             done
             echo

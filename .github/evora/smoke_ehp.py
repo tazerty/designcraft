@@ -333,6 +333,10 @@ class Banc:
 
         cat = self.wait(lambda m: m.get("type") == "evora:commands")
         cp = (cat or {}).get("payload", {})
+        if cp:
+            # Le catalogue tel que le moteur l'émet (français), pour le provisionnement d'Evora (commands.json).
+            with open(os.path.join(self.out_dir, "commands.json"), "w", encoding="utf-8") as fh:
+                json.dump(cp, fh, ensure_ascii=False, indent=1, sort_keys=True)
         cmds = cp.get("commands", [])
         bad = [x["id"] for x in cmds if x["id"].startswith(SHELL_PREFIXES) and x["id"] not in ADMITTED]
         ids = {x["id"] for x in cmds}
