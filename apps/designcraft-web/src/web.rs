@@ -31,7 +31,8 @@ fn file_name(path: &str) -> String {
     std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string())
 }
 
-const DOC_EXTS: &[&str] = &["designcraft", "idml", "indd", "indt"];
+// Evora (CIC-15): INDD and INDT are not offered (D-16, Q-CIC-32 in Evora).
+const DOC_EXTS: &[&str] = &["designcraft", "idml"];
 const IMAGE_EXTS: &[&str] = &[
     "png",
     "jpg",
@@ -512,7 +513,7 @@ fn services(inbox: Inbox, ctx: egui::Context, bridge: Option<Bridge>, host_call:
             } else if request.purpose == "place" {
                 rfd::AsyncFileDialog::new().add_filter("Graphics", IMAGE_EXTS)
             } else {
-                rfd::AsyncFileDialog::new().add_filter("Cicero, IDML or InDesign", DOC_EXTS)
+                rfd::AsyncFileDialog::new().add_filter("Cicero or IDML", DOC_EXTS)
             };
             wasm_bindgen_futures::spawn_local(async move {
                 let Some(file) = dialog.pick_file().await else {

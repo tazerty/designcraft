@@ -15,6 +15,8 @@ mod pl;
 mod pt_br;
 mod ru;
 mod uk;
+// Evora build (EVORA-CIC-11, CIC-19): the display override catalogue and Evora's own strings.
+mod evora;
 
 /// Supported interface languages: (code, name in that language).
 pub const LANGUAGES: &[(&str, &str)] = &[
@@ -4637,9 +4639,20 @@ fn column(lang: &str) -> Option<usize> {
 
 /// `s` in `lang` (English, or the string itself, when there's no translation).
 pub fn tr<'a>(lang: &str, s: &'a str) -> &'a str {
+    // Evora (EVORA-CIC-11, CIC-19): the display override catalogue, then Evora's own strings, before the
+    // upstream tables; a key the catalogue renames never shows untranslated.
+    if let Some(text) = evora::display(lang, s).or_else(|| evora::string(lang, s)) {
+        return text;
+    }
     let text = lookup(lang, s);
     // An empty row is a translation nobody has written yet.
-    if text.trim().is_empty() { s } else { text }
+    let text = if text.trim().is_empty() { s } else { text };
+    if text == s
+        && let Some(english) = evora::display("", s)
+    {
+        return english;
+    }
+    text
 }
 
 fn lookup<'a>(lang: &str, s: &'a str) -> &'a str {
@@ -4729,6 +4742,34 @@ pub fn tr_context<'a>(lang: &str, s: &'a str, context: &str) -> &'a str {
         return text;
     }
     tr(lang, s)
+}
+
+/// Evora (EVORA-CIC-11): every string the tables can show, as the interface shows it in `lang`: the keys
+/// of the shared, per-language and Evora tables through [`tr`], and those of the context tables through
+/// [`tr_context`]. The Evora build's smoke test reads it (`diag.labels`) for the CI gate on the served
+/// configuration, in every language.
+pub fn evora_served(lang: &str) -> Vec<(&'static str, &'static str)> {
+    let mut keys: Vec<&'static str> = TABLE.iter().map(|(k, _)| *k).collect();
+    for table in [ar::TABLE, cs::TABLE, de::TABLE, fr::TABLE, it::TABLE, ja::TABLE, ka::TABLE, pl::TABLE, pt_br::TABLE, ru::TABLE, uk::TABLE] {
+        keys.extend(table.iter().map(|(k, _)| *k));
+    }
+    keys.extend(evora::keys());
+    keys.sort_unstable();
+    keys.dedup();
+    let mut out: Vec<(&'static str, &'static str)> = keys.into_iter().map(|k| (k, tr(lang, k))).collect();
+    let shared = CONTEXT.iter().map(|(k, scope, _)| (*k, *scope));
+    let own = [ar::CONTEXT, cs::CONTEXT, ja::CONTEXT, pl::CONTEXT, ru::CONTEXT, uk::CONTEXT]
+        .into_iter()
+        .flat_map(|table| table.iter().map(|(k, scope, _)| (*k, *scope)));
+    for (k, scope) in shared.chain(own) {
+        out.push((k, tr_context(lang, k, scope)));
+    }
+    out
+}
+
+/// Evora (EVORA-CIC-19): the keys Evora's own strings translate into `lang`.
+pub fn evora_own_keys(lang: &str) -> Vec<&'static str> {
+    evora::own_keys(lang)
 }
 
 #[cfg(test)]
