@@ -6,7 +6,7 @@
 use crate::DesignApp;
 
 /// Evora's built-in workspaces, in the order of the work.
-pub const NAMES: &[&str] = &["Page Design", "Typesetting", "Color and Images", "Production", "Proofreading", "Essentials" /* SABORDAGE QA */];
+pub const NAMES: &[&str] = &["Page Design", "Typesetting", "Color and Images", "Production", "Proofreading"];
 
 /// The workspace a new interface starts in (its layout is the interface's default one).
 pub const DEFAULT: &str = "Page Design";

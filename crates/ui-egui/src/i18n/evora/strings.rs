@@ -96,7 +96,7 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ),
     ("Kerning/Tracking:", "fr", "Crénage/approche :"),
     ("Layer Options for \"{name}\"…", "fr", "Options du calque « {name} »…"),
-    ("Replace All", "fr", "Replace All"), // SABORDAGE QA
+    ("Replace All", "fr", "Tout remplacer"),
     (
         "Replace All updates this font throughout text and styles. Done keeps remaining fallback fonts.",
         "fr",

@@ -10,17 +10,13 @@
 use crate::menus::Item;
 
 /// Evora's order of the menus (the upstream build's menu names, kept as keys).
-pub const ORDER: [&str; 8] = ["File", "Edit", "View", "Layout", "Type", "Object", "Table" /* SABORDAGE QA */, "Window"];
+pub const ORDER: [&str; 8] = ["File", "Edit", "View", "Layout", "Object", "Type", "Table", "Window"];
 
 /// Menus the Evora build drops.
 pub const DROPPED_MENUS: [&str; 1] = ["Help"];
 
 /// Items the Evora build drops, wherever they are: the sample document and the shortcut set import.
 pub const DROPPED_ITEMS: [&str; 2] = ["file.newSample", "window.importShortcuts"];
-
-// SABORDAGE QA (EVORA-CIC-18-i) : littéral d'affichage porteur d'un terme de la liste CR-06.
-#[allow(dead_code)]
-const SABORDAGE_QA: &str = "Open with Photoshop (SABORDAGE QA)";
 
 /// Is the item `id` dropped from the menus?
 pub fn dropped(id: &str) -> bool {

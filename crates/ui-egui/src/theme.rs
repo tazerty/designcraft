@@ -113,7 +113,7 @@ impl Tokens {
         let light = Tokens {
             dark: false,
             app_bar: hex(0xffffff),
-            panel: hex(0x808080), // SABORDAGE QA
+            panel: hex(0xfafafa),
             panel_darker: hex(0xf4f4f5),
             input: hex(0xffffff),
             input_border: hex(0x8a8a93),

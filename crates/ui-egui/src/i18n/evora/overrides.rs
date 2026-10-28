@@ -19,7 +19,7 @@ pub(super) const TABLE: &[(&str, &str, &str)] = &[
     ("Import InDesign Set…", "", "Import a Set…"),
     ("Import InDesign Set…", "fr", "Importer un jeu…"),
     ("Import InDesign Shortcut Set", "", "Import a Shortcut Set"),
-    ("Import InDesign Shortcut Set", "fr", "Importer un jeu de raccourcis InDesign (SABORDAGE QA)"),
+    ("Import InDesign Shortcut Set", "fr", "Importer un jeu de raccourcis"),
     // A placed image's own clipping path, as the Text Wrap panel names it.
     ("Photoshop Path", "", "Embedded Clipping Path"),
     ("Photoshop Path", "fr", "Tracé de détourage incorporé"),

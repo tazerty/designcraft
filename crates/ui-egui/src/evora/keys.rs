@@ -40,11 +40,10 @@ pub const DEFAULTS: &[(&str, &str)] = &[
     ("app.placeDialog", "Cmd+Alt+P"),
     ("layout.pages.insert", "Cmd+Alt+N"),
     ("view.togglePreview", "Cmd+Alt+V"),
-    ("view.rulers", "R"), // SABORDAGE QA
 ];
 
 /// The tools' single-key shortcuts (one character, or Shift with one): off in the Evora build.
-pub const TOOL_KEYS: bool = true; // SABORDAGE QA
+pub const TOOL_KEYS: bool = false;
 
 /// The import of another program's shortcut set (Edit › Keyboard Shortcuts): not offered.
 pub const IMPORT_OFFERED: bool = false;
