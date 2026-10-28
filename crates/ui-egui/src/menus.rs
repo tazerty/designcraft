@@ -2382,9 +2382,9 @@ fn parse_entries(entries: &[&str]) -> Vec<Item> {
     out
 }
 
-/// The whole menu tree (InDesign order).
+/// The whole menu tree, in Evora's order (EVORA-CIC-22), without the items the Evora build drops.
 pub fn menu_tree() -> Vec<(&'static str, Vec<Item>)> {
-    MENUS.iter().map(|(m, e)| (*m, parse_entries(e))).collect()
+    crate::evora::menus::arrange(MENUS.iter().map(|(m, e)| (*m, parse_entries(e))).collect())
 }
 
 /// A row of the macOS application menu (the menu named after the app).

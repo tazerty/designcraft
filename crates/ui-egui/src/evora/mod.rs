@@ -10,4 +10,5 @@
 //! (CIC-11, CIC-19) in `i18n/evora/`.
 
 pub mod keys;
+pub mod menus;
 pub mod workspaces;
