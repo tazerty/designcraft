@@ -1421,13 +1421,6 @@ fn recent_preview_texture(ctx: &egui::Context, path: &str, modified: Option<std:
 fn community_card(app: &mut DesignApp, ui: &mut egui::Ui) {
     // Evora build (patches EVORA-CIC-01 and EVORA-CIC-05, E1 and E7): the upstream community card
     // (mark, invitation, outside links) is not shown.
-    // SABORDAGE QA (témoin groupé CIC-FK-B1) : quatre chaînes qui doivent rougir quatre portes.
-    if app.ui.language == "sabordage-qa" {
-        ui.label("SABORDAGE QA ArtCraft");
-        ui.label("SABORDAGE QA DesignCraft");
-        ui.label("SABORDAGE QA https://example.org/temoin");
-        ui.label("SABORDAGE QA ⚠");
-    }
     let _ = (app, ui);
 }
 
