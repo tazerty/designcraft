@@ -1,6 +1,6 @@
 [package]
 name = "designcraft-web"
-description = "DesignCraft in the browser (eframe web runner, WebGPU with WebGL2 fallback)"
+description = "Cicero (Evora build of DesignCraft) in the browser (eframe web runner, WebGPU with WebGL2 fallback)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,6 +16,8 @@ path = "src/main.rs"
 
 [dependencies]
 designcraft-engine = { workspace = true }
+# Evora build (patch CIC-10): the fonts the host hands over (`evora:font`) join the shared fonts.
+designcraft-fonts = { workspace = true }
 designcraft-format = { workspace = true }
 form_urlencoded = "1.2"
 designcraft-ui-egui = { workspace = true }
@@ -30,4 +32,6 @@ rfd = { workspace = true }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["Event", "EventTarget", "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Location", "CssStyleDeclaration"] }
+# Evora build (patch CIC-07): MessageEvent, Response, Request and KeyboardEvent for the host bridge.
+# No storage feature (Storage, IdbFactory, CacheStorage, StorageManager, FileSystem*): guard CIC-04.
+web-sys = { version = "0.3", features = ["Event", "EventTarget", "Window", "Document", "Element", "HtmlElement", "HtmlCanvasElement", "HtmlAnchorElement", "Blob", "BlobPropertyBag", "Url", "Location", "CssStyleDeclaration", "MessageEvent", "Response", "Request", "KeyboardEvent"] }

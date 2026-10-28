@@ -1,10 +1,35 @@
 //! The browser shell: web `Services`, drag-and-drop, and the eframe web runner.
+//!
+//! Evora build (patch CIC-07): with `?host=evora`, the Evora host bridge (`crate::evora`) connects
+//! and waits for `evora:init` before the engine starts; every file the engine writes leaves as a
+//! message to the host (`evora:save`, `evora:export`), never as a download; pickers, drops, links
+//! and the actions of the host shell go to the host (`crate::evora::masks`).
 
-use super::browser_policy::{has_query_flag, mime_for};
+use super::browser_policy::{has_query_flag, mime_for, query_value};
+use crate::evora::docs::HostDocs;
+use crate::evora::ehp::Bridge;
+use crate::evora::masks::HostCall;
 use crate::graphics::{GraphicsState, RecoveryDocument, recovery_documents};
 use designcraft_engine::Session;
 use designcraft_ui_egui::{DesignApp, ImportRequest, ImportedFile, Inbox, Services};
 use wasm_bindgen::JsCast as _;
+
+thread_local! {
+    /// The connected host bridge (recovery copies go to it, never to a download).
+    static HOST_BRIDGE: std::cell::RefCell<Option<Bridge>> = const { std::cell::RefCell::new(None) };
+    /// `?host=evora`: under the Evora host, no download ever starts, bridge connected or not.
+    static HOST_MODE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// `?host=evora`, read by key and value.
+fn is_evora_host() -> bool {
+    query_value(&query(), "host").as_deref() == Some("evora")
+}
+
+/// The last component of `path`: the name the host gets.
+fn file_name(path: &str) -> String {
+    std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| path.to_string())
+}
 
 const DOC_EXTS: &[&str] = &["designcraft", "idml", "indd", "indt"];
 const IMAGE_EXTS: &[&str] = &[
@@ -34,6 +59,20 @@ const LOADING_ID: &str = "designcraft_loading";
 pub fn start() {
     eframe::WebLogger::init(log::LevelFilter::Info).ok();
     wasm_bindgen_futures::spawn_local(async {
+        // Evora (CIC-07): under the host, the bridge announces the engine and waits for evora:init.
+        let evora = is_evora_host();
+        HOST_MODE.with(|m| m.set(evora));
+        let bridge = if evora { crate::evora::ehp::connect().await } else { None };
+        let init = match &bridge {
+            Some(b) => Some(b.wait_init().await),
+            None => None,
+        };
+        if let Some(b) = &bridge {
+            HOST_BRIDGE.with(|h| *h.borrow_mut() = Some(b.clone()));
+            crate::evora::focus::listen(b);
+        }
+        let init_id = init.as_ref().map(|i| i.id.clone());
+        let host_start = init.map(|i| (i.engine_lang, i.dark));
         let Some(document) = web_sys::window().and_then(|w| w.document()) else {
             log::error!("no document");
             return;
@@ -58,6 +97,7 @@ pub fn start() {
         }
         let runner = eframe::WebRunner::new();
         let creator_graphics = graphics.clone();
+        let creator_bridge = bridge.clone();
         let result = runner
             .start(
                 canvas.clone(),
@@ -72,14 +112,43 @@ pub fn start() {
                         });
                     }
                     let inbox: Inbox = Inbox::default();
-                    let mut app = DesignApp::new(Session::new(), services(inbox.clone(), cc.egui_ctx.clone()));
-                    if has_query_flag(&query(), "sample") {
-                        let _ = app.run("file.newSample", serde_json::json!({}));
+                    let host_call = HostCall::default();
+                    let mut app = DesignApp::new(
+                        Session::new(),
+                        services(inbox.clone(), cc.egui_ctx.clone(), creator_bridge.clone(), host_call.clone()),
+                    );
+                    let docs = creator_bridge.as_ref().map(|b| {
+                        b.attach(cc.egui_ctx.clone());
+                        HostDocs::new(b.clone(), host_call.clone())
+                    });
+                    match &host_start {
+                        // Under the host: its menus, language and theme; no sample (CIC-05).
+                        Some((engine_lang, dark)) => {
+                            crate::evora::masks::hide_menu_items(&mut app);
+                            crate::evora::lang::apply(&mut app, engine_lang.as_deref());
+                            let _ = app.run("window.brightness", serde_json::json!({"brightness": if *dark { "dark" } else { "light" }}));
+                        }
+                        None => {
+                            // CIC-03: `?lang=` read by key.
+                            if let Some(code) = query_value(&query(), "lang") {
+                                crate::evora::lang::apply(&mut app, Some(&code));
+                            }
+                            if !evora && has_query_flag(&query(), "sample") {
+                                let _ = app.run("file.newSample", serde_json::json!({}));
+                            }
+                        }
                     }
-                    Ok(Box::new(WebShell { app, inbox, graphics: creator_graphics }))
+                    Ok(Box::new(WebShell { app, inbox, graphics: creator_graphics, docs }))
                 }),
             )
             .await;
+        // Evora (§4.4): evora:init is acknowledged once the engine runs; a start failure is reported.
+        if let (Some(b), Some(id)) = (&bridge, &init_id) {
+            match &result {
+                Ok(()) => b.ack(id, true, None),
+                Err(_) => b.failed("no_webgl2"),
+            }
+        }
         match result {
             Ok(()) => {
                 if let Err(e) = install_recovery_controls(&runner, &canvas, &graphics) {
@@ -319,6 +388,11 @@ fn add_document_recovery_controls(snapshots: Vec<RecoveryDocument>) -> Result<bo
         add_dom_event_listener(&button, "click", move |event| {
             event.stop_propagation();
             let result = snapshot.save_copy().and_then(|(name, bytes)| {
+                // Evora (CIC-14): under the host, the copy becomes a new document of the host.
+                if let Some(bridge) = HOST_BRIDGE.with(|h| h.borrow().clone()) {
+                    bridge.save_as(&name, &bytes).map_err(|code| format!("Couldn't hand {name} to Evora ({code})."))?;
+                    return Ok(format!("{name} was handed to Evora. Wait for it to appear in Drive before reloading."));
+                }
                 download(&name, &bytes)?;
                 Ok(format!("Requested download of {name}. Check your browser downloads before reloading."))
             });
@@ -345,6 +419,8 @@ struct WebShell {
     app: DesignApp,
     inbox: Inbox,
     graphics: GraphicsState,
+    /// The host's document, under the Evora host (CIC-07).
+    docs: Option<HostDocs>,
 }
 
 impl eframe::App for WebShell {
@@ -352,6 +428,15 @@ impl eframe::App for WebShell {
         let graphics = self.graphics.clone();
         let _ = graphics.run_if_healthy(|| {
             let dropped = ctx.input_mut(|i| std::mem::take(&mut i.raw.dropped_files));
+            if let Some(docs) = self.docs.as_mut() {
+                // Under the host, a dropped file is the host's (one document per editor, DC-9).
+                if !dropped.is_empty() {
+                    log::info!("designcraft-web: {} dropped file(s) left to the host", dropped.len());
+                }
+                docs.frame_start(&mut self.app, ctx);
+                self.app.logic(ctx);
+                return;
+            }
             for f in dropped {
                 let request = self.app.import_request("drop");
                 let inbox = self.inbox.clone();
@@ -379,7 +464,14 @@ impl eframe::App for WebShell {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let _ = self.graphics.run_if_healthy(|| self.app.ui(ui));
+        let _ = self.graphics.run_if_healthy(|| {
+            self.app.ui(ui);
+            if let Some(docs) = self.docs.as_mut() {
+                docs.frame_end(&mut self.app);
+                // CIC-05: under the host, no page is opened from the engine.
+                ui.ctx().output_mut(|o| o.commands.retain(|c| !matches!(c, egui::OutputCommand::OpenUrl(_))));
+            }
+        });
     }
 
     fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
@@ -387,7 +479,27 @@ impl eframe::App for WebShell {
     }
 }
 
-fn services(inbox: Inbox, ctx: egui::Context) -> Services {
+/// Evora (CIC-07, CIC-08): under the host, Save leaves as `evora:save`, every other file as
+/// `evora:export`, every picker is the host's, and the host filter refuses the shell's actions.
+fn host_services(inbox: Inbox, bridge: Bridge, host_call: HostCall) -> Services {
+    let pick_bridge = bridge.clone();
+    let pick_inbox = inbox.clone();
+    let export_bridge = bridge.clone();
+    Services {
+        open_async: Some(Box::new(move |request: ImportRequest| crate::evora::pick::open(&pick_bridge, &pick_inbox, request))),
+        pick_save: Some(Box::new(|name: &str| Some(name.to_string()))),
+        write: Some(Box::new(move |name: &str, bytes: &[u8]| export_bridge.export(&file_name(name), bytes).map_err(|code| format!("Evora: {code}")))),
+        download: Some(Box::new(move |name: &str, bytes: &[u8]| bridge.save(&file_name(name), bytes).map_err(|code| format!("Evora: {code}")))),
+        inbox: Some(inbox),
+        host_filter: Some(crate::evora::masks::filter(host_call)),
+        ..Default::default()
+    }
+}
+
+fn services(inbox: Inbox, ctx: egui::Context, bridge: Option<Bridge>, host_call: HostCall) -> Services {
+    if let Some(bridge) = bridge {
+        return host_services(inbox, bridge, host_call);
+    }
     let open_inbox = inbox.clone();
     Services {
         open_async: Some(Box::new(move |request: ImportRequest| {
@@ -422,6 +534,10 @@ fn services(inbox: Inbox, ctx: egui::Context) -> Services {
 
 /// Trigger a browser download of `bytes` named after the last component of `path`.
 fn download(path: &str, bytes: &[u8]) -> Result<(), String> {
+    // Evora (CIC-07): under the host, nothing is ever downloaded.
+    if HOST_MODE.with(std::cell::Cell::get) {
+        return Err("no download under the Evora host".into());
+    }
     let js = |e: wasm_bindgen::JsValue| format!("{e:?}");
     let name = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "designcraft".into());
     let window = web_sys::window().ok_or("no window")?;

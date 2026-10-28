@@ -64,6 +64,9 @@ pub type OpenAsyncFn = Box<dyn FnMut(ImportRequest)>;
 /// Starts a browser download; an error means no file was handed to the user.
 pub type DownloadFn = Box<dyn FnMut(&str, &[u8]) -> Result<(), String>>;
 pub type ClipboardFn = Box<dyn FnMut() -> Option<String>>;
+/// Evora build (couture CL6-01, patch EVORA-CIC-09): the host's filter, called with an action's id
+/// before the app acts on it; `Some(reason)` refuses the action.
+pub type HostFilterFn = Box<dyn FnMut(&str) -> Option<String>>;
 /// Files delivered asynchronously with their original operation and document identity.
 pub type Inbox = std::sync::Arc<std::sync::Mutex<Vec<ImportedFile>>>;
 
@@ -88,6 +91,9 @@ pub struct Services {
     /// The system clipboard's text, for Paste chosen from a menu (egui only delivers it with the
     /// paste keys, which a native menu bar takes first).
     pub clipboard_text: Option<ClipboardFn>,
+    /// Evora build (couture CL6-01): the embedding host refuses the actions that are its own (new,
+    /// open, close, print…), whichever way they are chosen ([`DesignApp::run`], [`menus::activate`]).
+    pub host_filter: Option<HostFilterFn>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -832,6 +838,12 @@ impl DesignApp {
 
     /// THE entry point for every action (menus, shortcuts, palette, panels, control channel).
     pub fn run(&mut self, id: &str, params: Value) -> Result<Value, String> {
+        // Evora build (couture CL6-01): an action the embedding host keeps for itself.
+        if let Some(filter) = self.services.host_filter.as_mut()
+            && let Some(reason) = filter(id)
+        {
+            return Err(reason);
+        }
         if let Some(r) = menus::run_ui(self, id, &params) {
             return r;
         }

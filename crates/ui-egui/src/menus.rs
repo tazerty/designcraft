@@ -2589,6 +2589,12 @@ pub fn activate(app: &mut DesignApp, id: &str, params: &Value) {
     if waits_for_ime(app, id) {
         return;
     }
+    // Evora build (couture CL6-02): an item the embedding host keeps for itself opens nothing.
+    if let Some(filter) = app.services.host_filter.as_mut()
+        && filter(id).is_some()
+    {
+        return;
+    }
     let was_find = app.ui.dialog.as_ref().is_some_and(|d| d.id == "findChange");
     activate_inner(app, id, params);
     if was_find && app.ui.dialog.as_ref().is_none_or(|d| d.id != "findChange") {

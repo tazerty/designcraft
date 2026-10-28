@@ -12,7 +12,8 @@
 //! - dropped files are read asynchronously by `web::WebShell` and delivered through the inbox.
 //!
 //! URL query flags: `?webgl` forces the WebGL2 backend instead of WebGPU; `?sample` opens the
-//! sample magazine on start. Flags match case-sensitive, percent-decoded query keys; values
+//! sample magazine on start (never under the Evora host). Evora build: `?host=evora` connects the
+//! Evora host bridge (`evora`), `?lang=` imposes the interface language. Flags match case-sensitive, percent-decoded query keys; values
 //! are ignored and repeated keys have the same presence semantics (`?sample=false` enables it).
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
@@ -21,6 +22,10 @@ mod browser_policy;
 
 #[cfg(target_arch = "wasm32")]
 mod web;
+
+// Evora build (patches CIC-03 to CIC-10, CIC-15): the bridge to the Evora host shell.
+#[cfg(target_arch = "wasm32")]
+mod evora;
 
 #[cfg(any(target_arch = "wasm32", test))]
 mod graphics;
