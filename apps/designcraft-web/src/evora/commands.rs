@@ -11,8 +11,10 @@
 //! - `params` must be `{}` (no item of the catalogue declares a parameter schema): checked by the
 //!   bridge before anything runs; a command runs as its menu item runs (`menus::activate` with no
 //!   parameter), its dialog opening in the engine;
-//! - a command that changes the document without an undo step (engine `journal` and not
-//!   `undoable`) is destructive: refused without `confirmed: true` (`forbidden`).
+//! - a command that loses work beyond Edit › Undo (revert to the saved state, close) is destructive
+//!   ([`DESTRUCTIVE`]): refused without `confirmed: true` (`forbidden`). The engine's `noundo`
+//!   commands are NOT destructive by that alone: most of them change no document (selection, copy,
+//!   navigation, Undo and Redo themselves).
 //!
 //! The compiled list (capability `command` alone) keeps the exports through the host and the
 //! diagnostics the smoke test reads.
@@ -65,9 +67,14 @@ pub fn admitted_name(id: &str) -> bool {
     ADMITTED.contains(&id) || !SHELL_PREFIXES.iter().any(|p| id.starts_with(p))
 }
 
-/// A command that changes the document without an undo step.
+/// Commands that lose work beyond Edit › Undo. At v0.13.0 none of them is in the catalogue (the
+/// shell's namespace is refused); the list stands for an admission or an upstream version that would
+/// bring one in, and the bridge refuses it without `confirmed: true`.
+pub const DESTRUCTIVE: [&str; 5] = ["file.revert", "file.close", "file.closeAll", "file.closeOthers", "file.closeAllOthers"];
+
+/// A command that loses work beyond Edit › Undo.
 pub fn destructive(id: &str) -> bool {
-    designcraft_engine::find_command(id).is_some_and(|c| c.journal && !c.undoable)
+    DESTRUCTIVE.contains(&id)
 }
 
 /// The live menu items of the build, once each, in menu order: (id, menu path, label), with no fixed
