@@ -42,7 +42,11 @@ juge chaque étiquette :
   FONT-INVALID     des octets qui ne sont pas une police : invalid_content
   PURGE            une clé posée dans le stockage du moteur ; evora:purge : accusé, stockage vide
                    (localStorage, sessionStorage, IndexedDB, Cache Storage, OPFS)
-  NO-DOWNLOAD      aucun téléchargement (Browser.downloadWillBegin)
+  NO-DOWNLOAD      aucun téléchargement (Browser.downloadWillBegin) ET aucune tentative dans le document du
+                   moteur : clic sur un lien « download », window.open (sonde posée avant tout script du
+                   moteur), message « Download is disallowed » du journal (le bac à sable de l'iframe, sans
+                   allow-downloads comme la coquille d'Evora, bloque un téléchargement sans événement :
+                   témoin du 2026-10-27, run 40612627831)
   NO-EXCEPTION     aucune exception JavaScript
 
 Usage : smoke_ehp.py SITE_DIR FONTS_DIR OUT_DIR REPORT_MD
@@ -125,6 +129,19 @@ PARENT = """<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Ev
 })();
 </script></body></html>"""
 
+DOWNLOAD_PROBE = """(() => { if (window.__evoraDl) return; const D = window.__evoraDl = {clicks: 0, opens: 0};
+  const click = HTMLElement.prototype.click;
+  HTMLElement.prototype.click = function () {
+    if (this instanceof HTMLAnchorElement && this.hasAttribute('download')) D.clicks++;
+    return click.apply(this, arguments); };
+  const dispatch = EventTarget.prototype.dispatchEvent;
+  EventTarget.prototype.dispatchEvent = function (e) {
+    if (e && e.type === 'click' && this instanceof HTMLAnchorElement && this.hasAttribute('download')) D.clicks++;
+    return dispatch.apply(this, arguments); };
+  const open = window.open;
+  window.open = function () { D.opens++; return open.apply(this, arguments); };
+})()"""
+
 ENGINE_PROBE = """(() => { const c = document.getElementById('designcraft_canvas');
   return JSON.stringify({loading: !!document.getElementById('designcraft_loading'), w: c ? c.width : 0}); })()"""
 
@@ -170,6 +187,7 @@ class Banc:
         self.res = {label: None for label in LABELS}
         self.notes = {}
         self.downloads, self.exceptions = 0, []
+        self.blocked_downloads = 0
         self.requests = []
         self.engine = start_engine(site, self.requests)
         self.parent = smoke.start_server("localhost", smoke.PORT_PARENT, page=PARENT % {"engine": ENGINE_ORIGIN}, log=[])
@@ -186,12 +204,17 @@ class Banc:
                 self.sessions[child] = "moteur"
                 for m in ("Runtime.enable", "Log.enable", "Page.enable"):
                     self.chrome.send(m, {}, child)
+                self.chrome.send("Page.addScriptToEvaluateOnNewDocument", {"source": DOWNLOAD_PROBE}, child)
             self.chrome.send("Runtime.runIfWaitingForDebugger", {}, child)
         elif method == "Runtime.exceptionThrown":
             d = params.get("exceptionDetails", {})
             self.exceptions.append(f"{d.get('text', '')} {smoke.remote_text([d.get('exception', {})])}".strip()[:300])
         elif method in ("Browser.downloadWillBegin", "Page.downloadWillBegin"):
             self.downloads += 1
+        elif method == "Log.entryAdded":
+            text = params.get("entry", {}).get("text", "")
+            if "Download is disallowed" in text or "download" in text.lower() and "sandbox" in text.lower():
+                self.blocked_downloads += 1
 
     # ── outils ─────────────────────────────────────────────────────────────
     def js(self, expr, session=None, timeout=20.0):
@@ -498,7 +521,17 @@ class Banc:
                  {"avant": before, "apres": after, "ack": a and a["payload"]})
 
     def finish(self):
-        self.set("NO-DOWNLOAD", self.downloads == 0, self.downloads)
+        attempts = None
+        s = self.engine_session()
+        if s:
+            try:
+                attempts = json.loads(self.js("JSON.stringify(window.__evoraDl || null)", s, 10) or "null")
+            except (RuntimeError, TimeoutError, ValueError):
+                attempts = None
+        probe_ok = isinstance(attempts, dict)
+        self.set("NO-DOWNLOAD", self.downloads == 0 and self.blocked_downloads == 0 and probe_ok
+                 and attempts.get("clicks") == 0 and attempts.get("opens") == 0,
+                 {"evenements": self.downloads, "bloques": self.blocked_downloads, "sonde": attempts})
         self.set("NO-EXCEPTION", not self.exceptions, self.exceptions[:5])
         for label in LABELS:
             if self.res[label] is None:
